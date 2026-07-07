@@ -1,0 +1,509 @@
+# ohneben's HubSpot MCP
+
+[![CI](https://github.com/ohneben/Hubspot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/ohneben/Hubspot-MCP/actions/workflows/ci.yml)
+[![Publish Docker image](https://github.com/ohneben/Hubspot-MCP/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ohneben/Hubspot-MCP/actions/workflows/docker-publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE.md)
+
+**The most complete HubSpot MCP server there is.** Run your entire
+[HubSpot](https://www.hubspot.com/) account in plain language from **Claude**,
+**Cursor**, or any other [MCP](https://modelcontextprotocol.io) client.
+
+This [Model Context Protocol](https://modelcontextprotocol.io) server exposes the
+**whole public HubSpot API — 1,076 endpoint tools across 102 APIs** — CRM, CMS,
+Marketing, Automation, Conversations, Commerce, Files, Settings, Webhooks and
+more, generated straight from HubSpot's own OpenAPI definitions. Every tool is
+**safety-categorized** (🟢 read-only / 🟡 write / 🔴 destructive) and — unique to
+this server — **hub & plan aware**: HubSpot publishes which hub and tier every
+API needs (Free / Starter / Professional / Enterprise), and this server carries
+that straight into each tool plus a live **capability report** for *your*
+portal. It runs over **stdio** (Claude Desktop and other local launchers) or
+**Streamable HTTP** (hosted in Docker), and ships with retries, client-side rate
+limiting tuned to HubSpot's burst caps, and request timeouts so it holds up
+against a live account.
+
+## Why you'll want this
+
+Some MCP servers just forward a slice of the API. This one is built to be **safe
+to hand to an LLM**, **complete**, and **easy to run for real**:
+
+| What you get | Why it matters |
+| --- | --- |
+| **1,076 tools — the whole public API** | Contacts, companies, deals, tickets, every engagement type, associations v4, properties, pipelines, lists, imports/exports, marketing emails & events, campaigns, forms, transactional email, sequences, workflows/actions, conversations & custom channels, CMS pages/posts/HubDB/source code, files, commerce (invoices, orders, carts, payments, subscriptions), settings, webhooks — nothing hand-picked or left behind. Most servers stop at ~30 CRM tools. |
+| **Hub & plan awareness** *(nobody else has this)* | HubSpot gates APIs by hub and tier — HubDB needs Content/Marketing Hub **Professional**, custom-object schemas need **Enterprise**, sequences need Sales/Service **Professional**. Every tool states its requirement, straight from HubSpot's own API index. |
+| **`hubspot_get_capabilities`** | One call reports your portal, your token's granted scopes, today's API usage vs. the daily cap, and — per tool group — how many endpoints your token actually unlocks, with the scopes needed to unlock the rest. Optional live probes verify access end-to-end. No more walls of mystery 403s. |
+| **Curated safety categories** 🟢 / 🟡 / 🔴 | Not naive "GET = safe": a `POST …/search` is a **read-only query**, `merge` is flagged **irreversible**, `gdpr-delete` is a **permanent purge** (vs. archive → recycle bin), list-membership calls are reversible **links**, `POST /crm/v3/imports` is a **bulk import**, and transactional email is **sends messages**. |
+| **Machine-readable MCP annotations** (`readOnlyHint`, `destructiveHint`) | Hosts that honor annotations (Claude included) can auto-trust reads and demand confirmation before anything destructive. |
+| **Actionable error hints** | 403 with `MISSING_SCOPES` → the exact scopes to add and where; plain 403 on a gated API → the plan tier it needs; 401 → token type & expiry guidance; 429 → your limits. The model gets *how to fix it*, not just *what broke*. |
+| **Read-only mode & group filtering** | Expose only the 443 🟢 read-only tools (`HUBSPOT_READ_ONLY=true`), or narrow to the groups you use (`HUBSPOT_INCLUDE_GROUPS=contacts,deals,cms:*`). Area wildcards included. |
+| **Discovery mode** | `HUBSPOT_TOOL_MODE=discovery` swaps the 1,000+ tool list for 3 meta-tools (search / inspect / invoke over the same registry) — same coverage, tiny context footprint, and read-only mode still applies. |
+| **Real file uploads** | The multipart endpoints (Files, CRM imports, HubDB import, CMS source code) actually work — pass file content inline or as base64. Most generated servers can't do multipart at all. |
+| **Automatic retries with backoff** | Transient `429` / `5xx` responses are retried with jittered exponential backoff, honoring HubSpot's `Retry-After` header. |
+| **Built-in rate limiting** | Self-throttles under HubSpot's burst caps (default 100 req / 10 s) with a **separate limiter for the `/search` endpoints** (~5 req/s cap). A burst of tool calls won't trip a `429`. |
+| **Response-size guard** | Optionally cap huge list responses (`HUBSPOT_MAX_RESPONSE_CHARS`) so one call can't blow the model's context window. |
+| **CRM GraphQL passthrough** | HubSpot's GraphQL endpoint is query-only, so it's a 🟢 tool here — fetch a contact, its company and that company's deals in one round-trip. |
+| **Raw-request escape hatch** | `hubspot_api_request` reaches brand-new or beta endpoints the moment HubSpot ships them — auth, throttling and retries still handled server-side. |
+| **Two transports: stdio *and* Streamable HTTP** | Use it locally in Claude Desktop, or run one always-on server that any number of MCP clients reach over HTTP. |
+| **Docker + docker-compose, health check, auto-restart** | Production-style deployment out of the box: `docker compose up` and it stays up. |
+| **Optional bearer-token auth** on the HTTP endpoint | Put the server behind a shared secret the moment it's reachable beyond localhost. |
+| **Your token never reaches the model** | The access token lives in the server's environment and is injected on every request — the assistant only ever sees tool inputs and API responses. |
+| **Drop-in spec updates** | `npm run fetch-specs` pulls HubSpot's latest OpenAPI definitions (and their hub/tier metadata) from HubSpot's public index — new endpoints become new tools on rebuild, no code changes. |
+
+## How it compares
+
+There are a few ways to reach HubSpot from an AI assistant today. Here's how this
+server stacks up against the alternatives:
+
+| | **This server** | Official HubSpot MCP | shinzo-labs `hubspot-mcp` | `mcp-hubspot` (buryhuang) | CData MCP |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Approx. tools | **~1,079** | ~7 curated (remote) | 100+ | ~7 | 3 (generic SQL) |
+| Whole public API (CRM **and** CMS · Marketing · Automation · Commerce · Files · Settings · Webhooks) | ✅ | ➖ CRM + some content reads | ➖ CRM-centric | ❌ | ❌ |
+| Hub & plan-tier awareness per tool | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Account capability report (scopes · usage · unlocks) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Reads **and** writes | ✅ | ✅ | ✅ | ➖ partial | ❌ read-only |
+| Curated 🟢 / 🟡 / 🔴 safety categories | ✅ | ➖ | ➖ | ➖ | n/a |
+| `readOnlyHint` / `destructiveHint` annotations | ✅ | ➖ | ➖ | ➖ | ➖ |
+| Read-only mode + group filtering | ✅ | ❌ | ❌ | ❌ | always read-only |
+| File uploads (multipart) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| GraphQL passthrough | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Rate limiting + auto-retry (`429`/`5xx`) | ✅ | ➖ | ➖ | ❌ | ❌ |
+| `stdio` transport | ✅ | ✅ local package | ✅ | ✅ | ✅ |
+| Streamable-HTTP transport | ✅ | ✅ hosted remote | ✅ | ❌ | ❌ |
+| Docker + compose + health check | ✅ | ❌ | ➖ Dockerfile | ➖ image only | ❌ |
+| Self-hosted on your own infra | ✅ | ➖ vendor cloud | ✅ | ✅ | ✅ |
+| Language | TypeScript | TypeScript | TypeScript | Python | Java |
+| License | MIT | — | MIT | MIT | MIT |
+
+<sub>✅ = yes · ➖ = partial / not documented · ❌ = no. Compiled from each
+project's public documentation; this is an unofficial project, not affiliated
+with HubSpot or the projects listed. Tool counts are approximate and move as
+APIs evolve.</sub>
+
+**The short version:** the official remote server is a great managed on-ramp
+but covers a handful of curated tools. The community servers are solid but
+CRM-centric, without plan awareness or safety guardrails. This one gives you
+**the entire public API**, **hub/plan awareness no one else has**, **both
+transports**, a **production Docker deployment**, and **curated safety
+categories** — self-hosted, on your token, MIT.
+
+## What you can do
+
+Once it's connected, ask your assistant things like:
+
+- "Find jane@example.com, show her company, open deals and the last emails we exchanged."
+- "Create a $12,000 deal 'Acme expansion' in the Sales pipeline, stage Qualified, associated with Acme Corp."
+- "Search contacts created this month with lifecycle stage MQL and add them to the 'Q3 nurture' list."
+- "Which HubDB tables exist? Add a row to 'pricing' and publish the table."
+- "Clone last month's newsletter as a draft — don't publish."
+- "Upload this CSV and start a contact import mapped to email + first name."
+- "What can my token do? Check my API usage and which scopes are missing for HubDB." *(→ `hubspot_get_capabilities`)*
+- "Merge these two duplicate contacts — after showing me both records first."
+
+Tools are generated automatically from HubSpot's specs and grouped into
+🟢 read-only, 🟡 write and 🔴 destructive — so a well-behaved host can treat each
+group differently.
+
+## How it works
+
+```
+Claude / Cursor / any MCP client  ──MCP──►  this server  ──HTTPS──►  api.hubapi.com (your portal)
+```
+
+The server parses 104 bundled OpenAPI definitions (fetched from HubSpot's public
+API index, which also publishes per-API **hub/tier requirements**) into MCP
+tools — resolving `$ref`s, guarding against recursive schemas, deriving clean
+names like `contacts_search` and `hubdb_tables_create_table`, and tagging each
+tool with a curated safety category, its plan requirement and its OAuth scopes.
+Your access token is injected server-side on every request; the model never
+sees or handles it.
+
+## Hub & plan awareness
+
+HubSpot isn't one API — what you can call depends on **which hubs** (Marketing,
+Sales, Service, Content, Commerce, Operations) and **which tier** (Free,
+Starter, Professional, Enterprise) the portal has, plus the **scopes** granted
+to your token. This server is built around that reality:
+
+1. **Every tool description carries the requirement**, from HubSpot's own index:
+
+   ```
+   🟢 READ-ONLY · Hubdb (CMS) · GET /cms/v3/hubdb/tables
+   …
+   Plan: Professional tier of Marketing Hub / Content Hub. Scopes: hubdb.
+   ```
+
+2. **`hubspot_get_capabilities`** reports, for *your* portal and token: account
+   details, granted scopes, today's API usage vs. the daily cap, and per tool
+   group how many endpoints are unlocked (`"unlockedByScopes": "13/16"`), what
+   would unlock the rest, plan requirements and beta status. Pass
+   `probe_groups: ["hubdb"]` to live-verify with one cheap read per group —
+   plan gates often only surface as 403s, and this catches them up front.
+
+3. **403s come back with the fix**: missing scope → the exact scope name and
+   where to grant it; plan-gated API → the tier HubSpot requires.
+
+## Requirements
+
+- A **HubSpot account** and a **private app access token** (or an OAuth access
+  token) — see [Get your API credentials](#get-your-api-credentials).
+- **Docker** (Docker Desktop on macOS/Windows) for the quick start below — or
+  **Node.js ≥ 18** to [run from source](#run-from-source-stdio-no-docker).
+
+## Quick start (Docker)
+
+**1. Add your credentials.** Copy the example config and fill it in:
+
+```bash
+cp .env.example .env
+# edit .env → set HUBSPOT_ACCESS_TOKEN
+#           → set MCP_SHARED_TOKEN to a long random string if reachable beyond localhost
+```
+
+**2. Start the server:**
+
+```bash
+docker compose up -d --build
+```
+
+The bundled `docker-compose.yml` binds to `127.0.0.1:8765` only, so the server is
+reachable from your machine but not the network.
+
+**3. Confirm it's running:**
+
+```bash
+curl -s http://localhost:8765/health
+# → {"status":"ok","server":"hubspot-mcp","tools":1079,"endpoints":1076,"mode":"all"}
+```
+
+**4. Connect your MCP client.** The MCP endpoint is `http://localhost:8765/mcp`.
+
+- **Claude Desktop** — add a **custom connector** (Settings → Connectors) pointing
+  at the URL, or bridge it locally with
+  [`mcp-remote`](https://www.npmjs.com/package/mcp-remote). Add this under
+  `mcpServers` in your config, then fully quit and reopen the app:
+
+  ```json
+  {
+    "mcpServers": {
+      "hubspot": {
+        "command": "npx",
+        "args": [
+          "mcp-remote",
+          "http://localhost:8765/mcp",
+          "--header", "Authorization: Bearer YOUR_MCP_SHARED_TOKEN"
+        ]
+      }
+    }
+  }
+  ```
+
+  (Drop the `--header` line if you left `MCP_SHARED_TOKEN` empty.)
+
+- **Claude Code** — one command:
+
+  ```bash
+  claude mcp add --transport http hubspot http://localhost:8765/mcp
+  ```
+
+- **Claude Cowork** — shares Claude Code's MCP config, so the command above makes
+  the tools available there too.
+
+> **Tip:** 1,000+ tools is a lot for some clients. Trim the surface with
+> `HUBSPOT_INCLUDE_GROUPS` (e.g. `contacts,companies,deals,tickets,lists`), or
+> set `HUBSPOT_TOOL_MODE=discovery` to get the same coverage through 3
+> meta-tools — see [Context footprint](#context-footprint) for measured
+> numbers per configuration.
+
+### Prefer a prebuilt image?
+
+Every push to `main` publishes a ready-to-run image to the GitHub Container
+Registry, so you can skip the local build entirely:
+
+```bash
+docker run -d --name hubspot-mcp -p 127.0.0.1:8765:8765 --env-file .env \
+  ghcr.io/ohneben/hubspot-mcp:latest
+```
+
+## Get your API credentials
+
+The recommended way is a **private app** token:
+
+1. In HubSpot, open **Settings → Integrations → Private Apps** and click
+   **Create private app**.
+2. On the **Scopes** tab, tick what you want the assistant to reach. Scopes map
+   1:1 to tool groups — grant read scopes (`crm.objects.contacts.read`, …) for
+   a reporting setup, add write scopes only where you want changes. You can
+   change scopes later; the capability report shows what's missing for any
+   group.
+3. Create the app and copy the **access token** (`pat-…`) →
+   `HUBSPOT_ACCESS_TOKEN` in `.env`.
+
+Notes:
+
+- **OAuth access tokens work too** (for apps you've built) — but they expire
+  after ~30 minutes and this server does not refresh them; private-app tokens
+  are the right fit for a long-running server.
+- The token determines the portal — no portal ID needed.
+- **EU data residency**: if your portal lives in HubSpot's EU data center, set
+  `HUBSPOT_BASE_URL=https://api-eu1.hubapi.com`.
+
+## Configuration
+
+Everything is set in `.env` (copied from `.env.example`):
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `HUBSPOT_ACCESS_TOKEN` | ✅ | — | Private-app token (`pat-…`) or OAuth access token |
+| `HUBSPOT_BASE_URL` | — | `https://api.hubapi.com` | Use `https://api-eu1.hubapi.com` for EU data residency |
+| `MCP_TRANSPORT` | — | `stdio` | `stdio` or `http` (the Docker image defaults to `http`) |
+| `PORT` | — | `8765` | HTTP listen port |
+| `HOST` | — | `0.0.0.0` | HTTP bind address |
+| `MCP_HTTP_PATH` | — | `/mcp` | HTTP MCP route |
+| `MCP_SHARED_TOKEN` | — | _(off)_ | Require `Authorization: Bearer <token>` on `/mcp` |
+| `HUBSPOT_MAX_REQUESTS` | — | `100` | Client-side requests per window (`0` disables throttling) |
+| `HUBSPOT_RATE_WINDOW_MS` | — | `10000` | Rate-limit window in ms (default: 100 req / 10 s) |
+| `HUBSPOT_SEARCH_MAX_REQUESTS` | — | `4` | Extra throttle for `/search` endpoints (`0` disables) |
+| `HUBSPOT_SEARCH_RATE_WINDOW_MS` | — | `1000` | Search throttle window (default: 4 req / 1 s) |
+| `HUBSPOT_MAX_RETRIES` | — | `3` | Retries on `429` / `5xx` / network errors |
+| `HUBSPOT_TIMEOUT_MS` | — | `30000` | Per-attempt request timeout |
+| `HUBSPOT_READ_ONLY` | — | `false` | Expose only 🟢 read-only tools |
+| `HUBSPOT_INCLUDE_GROUPS` | — | _(all)_ | Only expose these groups — keys like `contacts,deals` and area wildcards like `cms:*` |
+| `HUBSPOT_EXCLUDE_GROUPS` | — | _(none)_ | Hide these groups (same syntax) |
+| `HUBSPOT_INCLUDE_BETA` | — | `true` | Include beta / developer-preview APIs |
+| `HUBSPOT_TOOL_MODE` | — | `all` | `all` (one tool per endpoint) or `discovery` (3 meta-tools) |
+| `HUBSPOT_ENABLE_GRAPHQL` | — | `true` | Expose the CRM GraphQL query tool |
+| `HUBSPOT_GRAPHQL_URL` | — | _(derived)_ | Override the GraphQL endpoint |
+| `HUBSPOT_ENABLE_RAW_REQUEST` | — | `true` | Expose the raw-request escape hatch (auto-hidden in read-only mode) |
+| `HUBSPOT_MAX_RESPONSE_CHARS` | — | `0` | Truncate responses longer than N chars (`0` = never) |
+| `HUBSPOT_SPEC_DIR` | — | _(bundled)_ | Load OpenAPI files + catalog.json from a different directory |
+
+After changing `.env`, reload with `docker compose up -d --force-recreate`.
+
+Run `npm run list-tools` (no credentials needed) to print the full catalog, the
+per-category counts, and every group key you can filter on — add `--names` to
+list all 1,076 tool names.
+
+## Tool safety categories
+
+Each tool's description starts with one of these banners and carries the matching
+[MCP annotations](https://modelcontextprotocol.io/docs/concepts/tools#tool-annotations):
+
+| Banner | Count | `readOnlyHint` | `destructiveHint` | Meaning |
+|---|:---:|:---:|:---:|---|
+| 🟢 **READ-ONLY** | 348 | `true` | `false` | `GET` — fetches data only. Safe. |
+| 🟢 **READ-ONLY · query** | 95 | `true` | `false` | A `POST` that *searches/reads* (object search, batch read, export start, token introspection) — changes no records. |
+| 🟡 **WRITE · creates data** | 245 | `false` | `false` | Creates records (not idempotent; may duplicate). |
+| 🟡 **WRITE · creates or updates** | 36 | `false` | `false` | Idempotent upserts (batch upsert, marketing-event upsert). |
+| 🟡 **WRITE · updates data** | 168 | `false` | `false` | Modifies records/settings in place. |
+| 🟡 **WRITE · links records** | 19 | `false` | `false` | Associates records (list memberships, v4 associations). Reversible. |
+| 🟡 **WRITE · unlinks records** | 12 | `false` | `false` | Removes associations. Reversible — records survive. |
+| 🟡 **WRITE · sends messages** | 4 | `false` | `false` | Marketing/transactional email, sequence enrollment, conversation replies. |
+| 🟡 **WRITE · bulk import** | 1 | `false` | `false` | `POST /crm/v3/imports` — can create/update thousands of records. |
+| 🔴 **DESTRUCTIVE · deletes data** | 96 | `false` | `true` | Deletes/archives a record (CRM archives are restorable ~90 days). |
+| 🔴 **DESTRUCTIVE · bulk delete** | 42 | `false` | `true` | Batch archive — many records in one call. |
+| 🔴 **DESTRUCTIVE · merges records** | 7 | `false` | `true` | HubSpot **cannot un-merge**. Confirm both IDs first. |
+| 🔴 **DESTRUCTIVE · permanent GDPR purge** | 3 | `false` | `true` | Skips the recycle bin; gone forever. |
+
+That's **443 read-only · 485 write · 148 destructive = 1,076 endpoint tools**,
+plus the three power tools below. Hosts that respect annotations (Claude
+included) can require confirmation for `destructiveHint` tools and trust
+`readOnlyHint` tools automatically. Prefer to lock it down further? Set
+`HUBSPOT_READ_ONLY=true` to expose *only* the 443 read-only tools (plus the 🟢
+capability and GraphQL tools).
+
+<details>
+<summary><strong>Coverage by area (APIs / 🟢 read / 🟡 write / 🔴 destructive)</strong></summary>
+
+| Area | APIs | 🟢 Read | 🟡 Write | 🔴 Delete | Tools |
+|---|:---:|:---:|:---:|:---:|:---:|
+| CRM | 58 | 216 | 245 | 92 | **553** |
+| CMS | 13 | 74 | 123 | 22 | **219** |
+| Marketing | 7 | 42 | 46 | 11 | **99** |
+| Conversations | 3 | 18 | 11 | 3 | **32** |
+| Automation | 3 | 17 | 10 | 4 | **31** |
+| Webhooks Journal | 1 | 20 | 3 | 3 | **26** |
+| Settings | 3 | 14 | 9 | 1 | **24** |
+| Files | 1 | 10 | 7 | 4 | **21** |
+| Communication Preferences | 1 | 6 | 8 | 0 | **14** |
+| Events | 3 | 4 | 7 | 2 | **13** |
+| Webhooks | 1 | 3 | 4 | 2 | **9** |
+| Data Studio | 1 | 1 | 6 | 1 | **8** |
+| Auth (OAuth) | 1 | 3 | 2 | 2 | **7** |
+| Account | 2 | 5 | 0 | 0 | **5** |
+| Commerce | 1 | 2 | 2 | 1 | **5** |
+| Scheduler | 1 | 3 | 2 | 0 | **5** |
+| Meta | 1 | 4 | 0 | 0 | **4** |
+| Business Units | 1 | 1 | 0 | 0 | **1** |
+| **Total** | **102** | **443** | **485** | **148** | **1,076** |
+
+</details>
+
+## Context footprint
+
+What does 1,000+ tools cost in model context? Measured on the bundled specs
+(`tools/list` JSON payload; tokens ≈ chars ÷ 3.6):
+
+| Configuration | Tools | Payload | ≈ Tokens |
+|---|---:|---:|---:|
+| Full (default) | 1,079 | 2.20 MB | ~612k |
+| Read-only mode | 445 | 0.61 MB | ~169k |
+| CRM core preset¹ | 176 | 0.29 MB | ~81k |
+| CRM core preset¹ + read-only | 65 | 0.10 MB | ~28k |
+| **Discovery mode** | **6** | **0.01 MB** | **~2k** |
+
+<sub>¹ `HUBSPOT_INCLUDE_GROUPS=contacts,companies,deals,tickets,lists,properties,associations,pipelines,crm-owners,notes,tasks,calls,emails,meetings`</sub>
+
+How to read that:
+
+- **Clients with tool search / deferred loading** (Claude Code, claude.ai
+  connectors) don't pay the upfront cost — tool definitions load on demand,
+  so full mode is fine and only the tools actually used land in context.
+- **Clients that inject every tool definition upfront** should pick a lever:
+  `HUBSPOT_TOOL_MODE=discovery` (~2k tokens, **zero coverage lost** — all
+  1,076 endpoints stay callable through search → inspect → invoke), a
+  `HUBSPOT_INCLUDE_GROUPS` preset, and/or `HUBSPOT_READ_ONLY=true`.
+- **Responses consume context too.** Cap outliers with
+  `HUBSPOT_MAX_RESPONSE_CHARS` (e.g. `40000`) and request only the
+  `properties` you need on CRM reads.
+- Oversized inline schemas are already handled: the four pathological
+  recursive schemas (list filters, workflow definitions — ~1.7 MB *each*
+  fully inlined) are budget-pruned to ≤24 KB with their top levels intact.
+
+## The power tools
+
+Besides the generated endpoint tools, the server ships four hand-built ones:
+
+- **`hubspot_get_capabilities`** 🟢 — the capability report described
+  [above](#hub--plan-awareness). Call it first in a session.
+- **`hubspot_graphql_query`** 🟢 — HubSpot's CRM GraphQL API
+  (`POST /collector/graphql`). Query-only by design (HubSpot exposes no
+  mutations), so it stays available even in read-only mode. Requires the
+  `collector.graphql_query.execute` scope and Marketing/Content Hub Pro+.
+- **`hubspot_api_request`** 🔴 — raw escape hatch for any path on the HubSpot
+  host (new betas, undocumented corners). Same auth injection, throttling and
+  retries. Hidden in read-only mode.
+- **Discovery mode** (`HUBSPOT_TOOL_MODE=discovery`) — replaces the 1,076
+  per-endpoint tools with `hubspot_search_endpoints` →
+  `hubspot_get_endpoint` → `hubspot_invoke_endpoint` over the same registry.
+  All filters (groups, beta, read-only) still apply; in read-only mode the
+  invoke tool physically cannot reach a write because writes aren't in the
+  registry.
+
+## Run from source (stdio, no Docker)
+
+Prefer the classic stdio mode for Claude Desktop? Build it locally:
+
+```bash
+npm install
+npm run build
+```
+
+Then point Claude Desktop at the compiled entrypoint in
+`claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hubspot": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/Hubspot-MCP/dist/index.js"],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "HUBSPOT_ACCESS_TOKEN": "pat-na1-…"
+      }
+    }
+  }
+}
+```
+
+## Keeping the specs current
+
+The bundled files under `spec/` are the source of truth for the tools. They are
+fetched from **HubSpot's own public API index**
+(`https://api.hubspot.com/public/api/spec/v1/specs`), which lists every public
+API with per-version OpenAPI documents **and the hub/tier requirements** this
+server bakes into tool descriptions. `spec/catalog.json` records what was
+fetched (API, version, stage, beta flag, requirements, docs links).
+
+To refresh against HubSpot's latest:
+
+```bash
+npm run fetch-specs   # rewrites spec/*.json + spec/catalog.json
+npm run build && npm run list-tools
+```
+
+New endpoints become new tools automatically — no code changes. The fetch
+script prefers each API's **stable classic version** (v1/v3/v4) and falls back
+to dated or beta versions when that's all HubSpot offers; a couple of APIs are
+pinned to bundle multiple genuinely-different versions (OAuth v1 + v3,
+Communication Preferences v3 + v4).
+
+## Development
+
+```bash
+npm install
+npm run build       # compile TypeScript → dist/
+npm test            # run the Vitest suite (81 tests)
+npm run list-tools  # print the categorized tool catalog (no credentials needed)
+npm run fetch-specs # refresh spec/ from HubSpot's public API index
+```
+
+CI builds and tests every push across Node 20 and 22; pushes to `main` also
+publish a Docker image to the GitHub Container Registry.
+
+## Notes & conventions
+
+- **Transports**: `MCP_TRANSPORT=stdio` (default) for local launchers;
+  `MCP_TRANSPORT=http` for the always-on Streamable-HTTP server the Docker image
+  runs.
+- **Paging**: CRM list tools use cursor paging — pass `limit` and the `after`
+  cursor from `paging.next.after`. Ask for the properties you need via the
+  `properties` parameter (arrays become repeated query params).
+- **Search**: the `*_search` tools take a JSON `body` with `filterGroups`,
+  `sorts`, `query`, `properties`, `limit` and `after`. HubSpot caps search at
+  ~5 req/s per token — the built-in search throttle keeps you under it.
+- **Batch tools** (`*_batch_read`, `*_batch_create`, …) are the efficient way
+  to touch many records — prefer them over loops of single calls.
+- **Associations**: use the v4 association tools (`associations_*`) to link
+  records, with optional labels via the association-schema tools.
+- **File uploads**: multipart tools accept file fields as
+  `{"fileName": "report.pdf", "contentBase64": "…"}` (or `content` for plain
+  text); other fields are sent as regular form fields, objects as JSON strings.
+- **Deletes are archives** for CRM objects (recycle bin, ~90 days) — the truly
+  permanent ones are the 🔴 `gdpr_delete` purge tools and record merges.
+- **Rate limits**: HubSpot enforces burst caps per 10 s (private apps:
+  100–200/10 s depending on plan; OAuth apps ~110/10 s) plus daily caps. The
+  server self-throttles at `HUBSPOT_MAX_REQUESTS` per window and retries any
+  `429` it still receives, honoring `Retry-After`. Check real usage anytime via
+  `hubspot_get_capabilities`.
+- **Request bodies**: write tools take a `body` argument; its schema is resolved
+  from the spec and shown to the model (e.g. `contacts_create` expects
+  `{"properties": {…}}`).
+- **Beta APIs** (developer preview / public beta) are included by default and
+  labelled ⚠️ in descriptions; hide them with `HUBSPOT_INCLUDE_BETA=false`.
+
+## Security
+
+- Your access token lives only in `.env`, which is git-ignored. **Never commit
+  real secrets.** The token grants whatever its scopes allow — if it leaks,
+  rotate it in **Settings → Integrations → Private Apps**.
+- The HTTP endpoint is unauthenticated by default (fine on localhost). To expose
+  it beyond your machine, set `MCP_SHARED_TOKEN` and send it as an
+  `Authorization: Bearer <token>` header — ideally behind TLS.
+- Destructive tools (delete / **merge** / **GDPR purge**) and **send** tools
+  (marketing & transactional email, sequences) carry the right annotations so a
+  well-behaved host prompts before acting — keep that confirmation on, or run
+  with `HUBSPOT_READ_ONLY=true`.
+- Scope the blast radius at the source: grant the private app only the scopes
+  you actually need — the capability report will tell you what's missing when
+  you want more.
+
+See [SECURITY.md](./SECURITY.md) for the full policy and how to report a
+vulnerability.
+
+## Credits & license
+
+An unofficial community integration for [HubSpot](https://www.hubspot.com/);
+not affiliated with or endorsed by HubSpot. Built on the
+[Model Context Protocol](https://modelcontextprotocol.io). Tools are generated
+from HubSpot's public OpenAPI definitions. Licensed under the
+[MIT License](./LICENSE.md).

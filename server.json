@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.ohneben/hubspot-mcp",
+  "description": "HubSpot MCP server — the whole public API (1,000+ endpoints across CRM, CMS, Marketing, Automation, Commerce & more) as safety-categorized, hub/plan-aware tools (Docker + Streamable HTTP).",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/ohneben/Hubspot-MCP",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registry_type": "oci",
+      "registry_base_url": "https://ghcr.io",
+      "identifier": "ohneben/hubspot-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "streamable-http"
+      },
+      "environment_variables": [
+        {
+          "name": "HUBSPOT_ACCESS_TOKEN",
+          "description": "HubSpot private-app access token (pat-...) from Settings -> Integrations -> Private Apps (an OAuth access token also works).",
+          "is_required": true,
+          "is_secret": true,
+          "format": "string"
+        },
+        {
+          "name": "HUBSPOT_BASE_URL",
+          "description": "API host. Default https://api.hubapi.com; use https://api-eu1.hubapi.com for EU data residency portals.",
+          "is_required": false,
+          "format": "string"
+        },
+        {
+          "name": "MCP_SHARED_TOKEN",
+          "description": "Optional bearer token required on the /mcp endpoint. Empty = open (localhost only).",
+          "is_required": false,
+          "is_secret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

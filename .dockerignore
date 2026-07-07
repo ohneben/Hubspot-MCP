@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+.env
+.env.local
+.env.example
+.DS_Store
+*.log
+tests
+scripts
+vitest.config.ts
+README.md
+SECURITY.md
+LICENSE.md

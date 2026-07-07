@@ -1,0 +1,20 @@
+services:
+  hubspot-mcp:
+    build: .
+    container_name: hubspot-mcp
+    restart: unless-stopped
+    # Bind to 127.0.0.1 only — the server is reachable from your laptop, not the network.
+    ports:
+      - "127.0.0.1:8765:8765"
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      HOST: 0.0.0.0
+      PORT: 8765
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8765/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
