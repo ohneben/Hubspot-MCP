@@ -58,12 +58,26 @@ describe("query building", () => {
     expect(q).toContain("properties=firstname");
     expect(q).toContain("limit=10");
   });
+
+  it("expands dynamic template params (objectProperty.{propname}) into per-key pairs", () => {
+    const op = find("get", "/events/v3/events");
+    const q = __test.buildQueryString(
+      op,
+      { objectProperty: { lifecyclestage: "lead" }, property: { utm_source: "x" }, limit: 5 },
+      new Set(),
+    );
+    expect(decodeURIComponent(q)).toContain("objectProperty.lifecyclestage=lead");
+    expect(decodeURIComponent(q)).toContain("property.utm_source=x");
+    expect(q).toContain("limit=5");
+    expect(q).not.toContain("%7B"); // no literal "{" ever reaches the wire
+  });
 });
 
 describe("path expansion", () => {
   it("URL-encodes path parameters", () => {
     const consumed = new Set<string>();
-    const out = __test.expandPath("/crm/v3/objects/contacts/{contactId}", { contactId: "a/b" }, consumed);
+    const op = find("get", "/crm/v3/objects/contacts/{contactId}");
+    const out = __test.expandPath(op, { contactId: "a/b" }, consumed);
     expect(out).toBe("/crm/v3/objects/contacts/a%2Fb");
     expect(consumed.has("contactId")).toBe(true);
   });

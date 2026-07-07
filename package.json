@@ -1,6 +1,6 @@
 {
   "name": "hubspot-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Model Context Protocol server for the HubSpot API. Exposes the entire public API surface (~1,000 endpoints across CRM, CMS, Marketing, Automation, Commerce & more) as safety-categorized MCP tools (read-only / write / destructive) with hub & plan-tier awareness, over stdio or Streamable HTTP.",
   "keywords": [
     "mcp",

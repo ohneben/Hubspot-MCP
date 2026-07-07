@@ -7,13 +7,13 @@
     "url": "https://github.com/ohneben/Hubspot-MCP",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packages": [
     {
       "registry_type": "oci",
       "registry_base_url": "https://ghcr.io",
       "identifier": "ohneben/hubspot-mcp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "streamable-http"
       },
