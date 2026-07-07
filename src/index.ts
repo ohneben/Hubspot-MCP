@@ -24,7 +24,7 @@ import {
 } from "./discovery.js";
 
 const SERVER_NAME = "hubspot-mcp";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.0.1";
 
 interface Registry {
   /** Endpoint tools generated from the specs (post-filtering). */

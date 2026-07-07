@@ -84,6 +84,29 @@ describe("operationsToTools", () => {
     }
   });
 
+  it("only exposes Anthropic-legal property keys — one bad key would break the whole client", () => {
+    // Regression: HubSpot's events spec declares template params like
+    // `objectProperty.{propname}`, which Claude's API rejects with
+    // "Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'".
+    const LEGAL = /^[a-zA-Z0-9_.-]{1,64}$/;
+    for (const t of tools) {
+      for (const key of Object.keys((t.inputSchema.properties as Record<string, unknown>) ?? {})) {
+        expect(key, `${t.name} exposes illegal property key ${JSON.stringify(key)}`).toMatch(LEGAL);
+      }
+      const required = (t.inputSchema.required as string[] | undefined) ?? [];
+      for (const key of required) expect(key, `${t.name} requires unknown key ${key}`).toMatch(LEGAL);
+    }
+  });
+
+  it("models the events template params as clean object-valued args", () => {
+    const events = byName.get("events_list")!;
+    const props = events.inputSchema.properties as Record<string, { type?: string; description?: string }>;
+    expect(props.objectProperty?.type).toBe("object");
+    expect(props.property?.type).toBe("object");
+    expect(props.objectProperty?.description).toContain("objectProperty.<key>=<value>");
+    expect(props["objectProperty.{propname}"]).toBeUndefined();
+  });
+
   it("explains the file-part convention on multipart tools", () => {
     const upload = byName.get("files_upload")!;
     const body = (upload.inputSchema.properties as Record<string, { description?: string }>).body;

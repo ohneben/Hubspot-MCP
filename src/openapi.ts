@@ -13,6 +13,21 @@ export interface ParameterSpec {
   description?: string;
   schema?: JsonSchema;
   explode?: boolean;
+  /**
+   * The key this parameter is exposed under in the tool's input schema.
+   * Anthropic's API only accepts property keys matching
+   * `^[a-zA-Z0-9_.-]{1,64}$`, but a few HubSpot specs declare template
+   * parameters like `objectProperty.{propname}` — one such key would make an
+   * MCP client reject the ENTIRE tool list. Always set on loaded operations;
+   * equals `name` whenever the raw name is already legal.
+   */
+  argName?: string;
+  /**
+   * For dynamic template parameters (`objectProperty.{propname}`): the literal
+   * query-key prefix. The tool argument takes an object and the client sends
+   * one `<prefix><key>=<value>` pair per entry.
+   */
+  dynamicPrefix?: string;
 }
 
 export interface Operation {
@@ -206,6 +221,46 @@ function resolveRequestBody(
 /** Auth/content headers we inject ourselves — never expose them as tool inputs. */
 const HEADERS_TO_SKIP = new Set(["authorization", "content-type", "accept"]);
 
+/** Anthropic's constraint on tool input-schema property keys. */
+export const TOOL_ARG_KEY = /^[a-zA-Z0-9_.-]{1,64}$/;
+
+const sanitizeArgKey = (name: string): string =>
+  name.replace(/[^a-zA-Z0-9_.-]+/g, "_").replace(/^[_.]+|[_.]+$/g, "").slice(0, 64) || "param";
+
+/**
+ * Give every parameter a schema-legal `argName` (unique per operation) and
+ * turn template parameters like `objectProperty.{propname}` into object-valued
+ * inputs the client expands back into `objectProperty.<name>=<value>` pairs.
+ */
+function assignArgNames(params: ParameterSpec[]): ParameterSpec[] {
+  const used = new Set<string>();
+  return params.map((p) => {
+    const out: ParameterSpec = { ...p };
+    const template = /^([^{}]*)\{[^{}]+\}$/.exec(p.name);
+    let base: string;
+    if (template) {
+      out.dynamicPrefix = template[1];
+      base = sanitizeArgKey(template[1].replace(/[._-]+$/, "") || "params");
+      out.schema = {
+        type: "object",
+        additionalProperties: true,
+        description:
+          (p.description ? `${p.description} ` : "") +
+          `Dynamic query parameters: each entry is sent as ${out.dynamicPrefix}<key>=<value> ` +
+          `(e.g. {"lifecyclestage": "lead"} → ${out.dynamicPrefix}lifecyclestage=lead).`,
+      };
+    } else {
+      base = TOOL_ARG_KEY.test(p.name) ? p.name : sanitizeArgKey(p.name);
+    }
+    let argName = base;
+    let i = 2;
+    while (used.has(argName)) argName = `${base.slice(0, 60)}_${i++}`;
+    used.add(argName);
+    out.argName = argName;
+    return out;
+  });
+}
+
 /** Extract the path portion of the first server URL (usually ``). */
 function serverPathFromDoc(doc: OpenApiDoc): string {
   const url = doc.servers?.[0]?.url ?? "";
@@ -303,10 +358,12 @@ export function loadSpec(specPath: string, entry: CatalogEntry): Operation[] {
         summary: op.summary,
         description: op.description,
         group: entry.group,
-        parameters: allParams.map((p) => ({
-          ...p,
-          schema: p.schema ? dereferenceSchema(doc, p.schema) : undefined,
-        })),
+        parameters: assignArgNames(
+          allParams.map((p) => ({
+            ...p,
+            schema: p.schema ? dereferenceSchema(doc, p.schema) : undefined,
+          })),
+        ),
         requestBodySchema,
         requestBodyRequired,
         requestBodyContentType,

@@ -77,12 +77,23 @@ if (process.argv.includes("--names")) {
   }
 }
 
-// Sanity: names must be unique and MCP-legal.
+// Sanity: names must be unique and MCP-legal, and every input-schema property
+// key must satisfy Anthropic's '^[a-zA-Z0-9_.-]{1,64}$' — a single illegal key
+// makes MCP clients reject the entire tool list.
 const seen = new Set<string>();
 const dups: string[] = [];
+let badKeys = 0;
 for (const t of tools) {
   if (!/^[a-z0-9_]+$/.test(t.name) || t.name.length > 64) console.warn(`⚠️  Illegal tool name: ${t.name}`);
   if (seen.has(t.name)) dups.push(t.name);
   seen.add(t.name);
+  for (const key of Object.keys((t.inputSchema.properties as Record<string, unknown>) ?? {})) {
+    if (!/^[a-zA-Z0-9_.-]{1,64}$/.test(key)) {
+      badKeys++;
+      console.warn(`⚠️  Illegal input property key in ${t.name}: ${JSON.stringify(key)}`);
+    }
+  }
 }
 console.log(dups.length ? `\n⚠️  Duplicate names: ${dups.join(", ")}` : "\nAll tool names unique ✓");
+console.log(badKeys ? `⚠️  ${badKeys} illegal property key(s)` : "All input property keys Anthropic-legal ✓");
+if (dups.length > 0 || badKeys > 0) process.exitCode = 1;
