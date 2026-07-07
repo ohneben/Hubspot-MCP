@@ -1,0 +1,2454 @@
+{
+  "fetchedAt": "2026-07-07T13:31:45.339Z",
+  "indexUrl": "https://api.hubspot.com/public/api/spec/v1/specs",
+  "apis": [
+    {
+      "slug": "account-info",
+      "group": "account-info",
+      "file": "account-info.json",
+      "name": "Account Info",
+      "area": "Account",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/account-information-api"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/25201/version/3"
+    },
+    {
+      "slug": "actions-v4",
+      "group": "actions-v4",
+      "file": "actions-v4.json",
+      "name": "Actions V4",
+      "area": "Automation",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": "PROFESSIONAL",
+        "commerce": "PROFESSIONAL",
+        "crmHub": "PROFESSIONAL",
+        "dataHub": "PROFESSIONAL"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/automation/custom-workflow-actions"
+      ],
+      "operations": 18,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22118/version/4"
+    },
+    {
+      "slug": "aeo",
+      "group": "aeo",
+      "file": "aeo.json",
+      "name": "Aeo",
+      "area": "Marketing",
+      "version": "2026-09-beta",
+      "stage": "LATEST",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 6,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/149685/version/2026-09-beta"
+    },
+    {
+      "slug": "app-uninstalls",
+      "group": "app-uninstalls",
+      "file": "app-uninstalls.json",
+      "name": "App Uninstalls",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": true,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/apps/authentication/working-with-oauth"
+      ],
+      "operations": 1,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22137/version/3"
+    },
+    {
+      "slug": "appointments",
+      "group": "appointments",
+      "file": "appointments.json",
+      "name": "Appointments",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 16,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22138/version/3"
+    },
+    {
+      "slug": "associations",
+      "group": "associations",
+      "file": "associations.json",
+      "name": "Associations",
+      "area": "CRM",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/associations/associations-v4"
+      ],
+      "operations": 10,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/25199/version/4"
+    },
+    {
+      "slug": "associations-schema",
+      "group": "associations-schema",
+      "file": "associations-schema.json",
+      "name": "Associations Schema",
+      "area": "CRM",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/associations/associations-v4"
+      ],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22142/version/4"
+    },
+    {
+      "slug": "audit-logs",
+      "group": "audit-logs",
+      "file": "audit-logs.json",
+      "name": "Audit Logs",
+      "area": "Account",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/account-activity-api"
+      ],
+      "operations": 3,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22116/version/3"
+    },
+    {
+      "slug": "authors",
+      "group": "authors",
+      "file": "authors.json",
+      "name": "Authors",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/blogs/blog-authors"
+      ],
+      "operations": 14,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22124/version/3"
+    },
+    {
+      "slug": "automation-v4",
+      "group": "automation-v4",
+      "file": "automation-v4.json",
+      "name": "Automation V4",
+      "area": "Automation",
+      "version": "4",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": "PROFESSIONAL",
+        "commerce": "PROFESSIONAL",
+        "crmHub": "PROFESSIONAL",
+        "dataHub": "PROFESSIONAL"
+      },
+      "documentation": [],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22119/version/4"
+    },
+    {
+      "slug": "blog-settings",
+      "group": "blog-settings",
+      "file": "blog-settings.json",
+      "name": "Blog Settings",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "STARTER",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22125/version/3"
+    },
+    {
+      "slug": "business-units",
+      "group": "business-units",
+      "file": "business-units.json",
+      "name": "Business Units",
+      "area": "Business Units",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": null,
+        "service": null,
+        "cms": "ENTERPRISE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/business-units-api"
+      ],
+      "operations": 1,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22122/version/3"
+    },
+    {
+      "slug": "calling-extensions",
+      "group": "calling-extensions",
+      "file": "calling-extensions.json",
+      "name": "Calling Extensions",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/extensions/calling-sdk"
+      ],
+      "operations": 13,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22143/version/3"
+    },
+    {
+      "slug": "calls",
+      "group": "calls",
+      "file": "calls.json",
+      "name": "Calls",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/calls"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22144/version/3"
+    },
+    {
+      "slug": "campaigns-public-api",
+      "group": "campaigns-public-api",
+      "file": "campaigns-public-api.json",
+      "name": "Campaigns Public Api",
+      "area": "Marketing",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/campaigns"
+      ],
+      "operations": 25,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22203/version/3"
+    },
+    {
+      "slug": "carts",
+      "group": "carts",
+      "file": "carts.json",
+      "name": "Carts",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/carts"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22145/version/3"
+    },
+    {
+      "slug": "cms-content-audit",
+      "group": "cms-content-audit",
+      "file": "cms-content-audit.json",
+      "name": "Cms Content Audit",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": "ENTERPRISE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/content-audit"
+      ],
+      "operations": 1,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22126/version/3"
+    },
+    {
+      "slug": "commerce-payments",
+      "group": "commerce-payments",
+      "file": "commerce-payments.json",
+      "name": "Commerce Payments",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": "FREE",
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/payments"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22146/version/3"
+    },
+    {
+      "slug": "commerce-subscriptions",
+      "group": "commerce-subscriptions",
+      "file": "commerce-subscriptions.json",
+      "name": "Commerce Subscriptions",
+      "area": "CRM",
+      "version": "3",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": "FREE",
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/subscriptions"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22147/version/3"
+    },
+    {
+      "slug": "communications",
+      "group": "communications",
+      "file": "communications.json",
+      "name": "Communications",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/communications"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22148/version/3"
+    },
+    {
+      "slug": "companies",
+      "group": "companies",
+      "file": "companies.json",
+      "name": "Companies",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/companies"
+      ],
+      "operations": 12,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22149/version/3"
+    },
+    {
+      "slug": "contacts",
+      "group": "contacts",
+      "file": "contacts.json",
+      "name": "Contacts",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/contacts"
+      ],
+      "operations": 13,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22150/version/3"
+    },
+    {
+      "slug": "contracts",
+      "group": "contracts",
+      "file": "contracts.json",
+      "name": "Contracts",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22151/version/3"
+    },
+    {
+      "slug": "conversations",
+      "group": "conversations",
+      "file": "conversations.json",
+      "name": "Conversations",
+      "area": "Conversations",
+      "version": "3",
+      "stage": "LATEST",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/conversations/inbox-and-messages"
+      ],
+      "operations": 18,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22196/version/3"
+    },
+    {
+      "slug": "courses",
+      "group": "courses",
+      "file": "courses.json",
+      "name": "Courses",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22152/version/3"
+    },
+    {
+      "slug": "crm-owners",
+      "group": "crm-owners",
+      "file": "crm-owners.json",
+      "name": "Crm Owners",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/owners"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22153/version/3"
+    },
+    {
+      "slug": "custom-channels",
+      "group": "custom-channels",
+      "file": "custom-channels.json",
+      "name": "Custom Channels",
+      "area": "Conversations",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/conversations/create-custom-channels"
+      ],
+      "operations": 13,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22197/version/3"
+    },
+    {
+      "slug": "custom-objects",
+      "group": "custom-objects",
+      "file": "custom-objects.json",
+      "name": "Custom Objects",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": "ENTERPRISE",
+        "service": "ENTERPRISE",
+        "cms": "ENTERPRISE",
+        "commerce": null,
+        "crmHub": "ENTERPRISE",
+        "dataHub": "ENTERPRISE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/using-object-apis"
+      ],
+      "operations": 12,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22154/version/3"
+    },
+    {
+      "slug": "datasource-ingestion",
+      "group": "datasource-ingestion",
+      "file": "datasource-ingestion.json",
+      "name": "Datasource Ingestion",
+      "area": "Data Studio",
+      "version": "2026-09-beta",
+      "stage": "LATEST",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 8,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/87765/version/2026-09-beta"
+    },
+    {
+      "slug": "deal-splits",
+      "group": "deal-splits",
+      "file": "deal-splits.json",
+      "name": "Deal Splits",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": "ENTERPRISE",
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/deal-splits"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22155/version/3"
+    },
+    {
+      "slug": "deals",
+      "group": "deals",
+      "file": "deals.json",
+      "name": "Deals",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/deals"
+      ],
+      "operations": 12,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/25196/version/3"
+    },
+    {
+      "slug": "discounts",
+      "group": "discounts",
+      "file": "discounts.json",
+      "name": "Discounts",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/discounts"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22157/version/3"
+    },
+    {
+      "slug": "domains",
+      "group": "domains",
+      "file": "domains.json",
+      "name": "Domains",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/domains"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22127/version/3"
+    },
+    {
+      "slug": "emails",
+      "group": "emails",
+      "file": "emails.json",
+      "name": "Emails",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/email"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22158/version/3"
+    },
+    {
+      "slug": "events",
+      "group": "events",
+      "file": "events.json",
+      "name": "Events",
+      "area": "Events",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": "ENTERPRISE",
+        "service": "ENTERPRISE",
+        "cms": "ENTERPRISE",
+        "commerce": "ENTERPRISE",
+        "crmHub": "ENTERPRISE",
+        "dataHub": "ENTERPRISE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/analytics-and-events/event-analytics"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22199/version/3"
+    },
+    {
+      "slug": "exports",
+      "group": "exports",
+      "file": "exports.json",
+      "name": "Exports",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/exports"
+      ],
+      "operations": 3,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22159/version/3"
+    },
+    {
+      "slug": "feedback-submissions",
+      "group": "feedback-submissions",
+      "file": "feedback-submissions.json",
+      "name": "Feedback Submissions",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/feedback-submissions"
+      ],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22160/version/3"
+    },
+    {
+      "slug": "fees",
+      "group": "fees",
+      "file": "fees.json",
+      "name": "Fees",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/fees"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22161/version/3"
+    },
+    {
+      "slug": "files",
+      "group": "files",
+      "file": "files.json",
+      "name": "Files",
+      "area": "Files",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/library/files"
+      ],
+      "operations": 21,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22202/version/3"
+    },
+    {
+      "slug": "forecast-types",
+      "group": "forecast-types",
+      "file": "forecast-types.json",
+      "name": "Forecast Types",
+      "area": "CRM",
+      "version": "3",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/36488/version/3"
+    },
+    {
+      "slug": "forecasts",
+      "group": "forecasts",
+      "file": "forecasts.json",
+      "name": "Forecasts",
+      "area": "CRM",
+      "version": "3",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/33167/version/3"
+    },
+    {
+      "slug": "forms",
+      "group": "forms",
+      "file": "forms.json",
+      "name": "Forms",
+      "area": "Marketing",
+      "version": "3",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": null,
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/forms"
+      ],
+      "operations": 6,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22204/version/3"
+    },
+    {
+      "slug": "goal-targets",
+      "group": "goal-targets",
+      "file": "goal-targets.json",
+      "name": "Goal Targets",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": "STARTER",
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/goals"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22162/version/3"
+    },
+    {
+      "slug": "hubdb",
+      "group": "hubdb",
+      "file": "hubdb.json",
+      "name": "Hubdb",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": "PROFESSIONAL",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 31,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/26239/version/3"
+    },
+    {
+      "slug": "imports",
+      "group": "imports",
+      "file": "imports.json",
+      "name": "Imports",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/imports"
+      ],
+      "operations": 5,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22163/version/3"
+    },
+    {
+      "slug": "invoices",
+      "group": "invoices",
+      "file": "invoices.json",
+      "name": "Invoices",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/invoices"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22164/version/3"
+    },
+    {
+      "slug": "leads",
+      "group": "leads",
+      "file": "leads.json",
+      "name": "Leads",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": "PROFESSIONAL",
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/leads"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22165/version/3"
+    },
+    {
+      "slug": "limits-tracking",
+      "group": "limits-tracking",
+      "file": "limits-tracking.json",
+      "name": "Limits Tracking",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/limits-tracking"
+      ],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22166/version/3"
+    },
+    {
+      "slug": "line-items",
+      "group": "line-items",
+      "file": "line-items.json",
+      "name": "Line Items",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/line-items"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22167/version/3"
+    },
+    {
+      "slug": "listings",
+      "group": "listings",
+      "file": "listings.json",
+      "name": "Listings",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22168/version/3"
+    },
+    {
+      "slug": "lists",
+      "group": "lists",
+      "file": "lists.json",
+      "name": "Lists",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/lists/overview"
+      ],
+      "operations": 30,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/26235/version/3"
+    },
+    {
+      "slug": "manage-event-definitions",
+      "group": "manage-event-definitions",
+      "file": "manage-event-definitions.json",
+      "name": "Manage Event Definitions",
+      "area": "Events",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": "ENTERPRISE",
+        "service": "ENTERPRISE",
+        "cms": "ENTERPRISE",
+        "commerce": "ENTERPRISE",
+        "crmHub": "ENTERPRISE",
+        "dataHub": "ENTERPRISE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/analytics-and-events/custom-events/custom-event-definitions"
+      ],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22200/version/3"
+    },
+    {
+      "slug": "marketing-emails",
+      "group": "marketing-emails",
+      "file": "marketing-emails.json",
+      "name": "Marketing Emails",
+      "area": "Marketing",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/emails/marketing-emails"
+      ],
+      "operations": 19,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/35045/version/3"
+    },
+    {
+      "slug": "marketing-events",
+      "group": "marketing-events",
+      "file": "marketing-events.json",
+      "name": "Marketing Events",
+      "area": "Marketing",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/marketing-events"
+      ],
+      "operations": 36,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22207/version/3"
+    },
+    {
+      "slug": "media-bridge",
+      "group": "media-bridge",
+      "file": "media-bridge.json",
+      "name": "Media Bridge",
+      "area": "CMS",
+      "version": "1",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/media-bridge"
+      ],
+      "operations": 33,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22129/version/1"
+    },
+    {
+      "slug": "meetings",
+      "group": "meetings",
+      "file": "meetings.json",
+      "name": "Meetings",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/meetings"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22170/version/3"
+    },
+    {
+      "slug": "multicurrency",
+      "group": "multicurrency",
+      "file": "multicurrency.json",
+      "name": "Multicurrency",
+      "area": "Settings",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/currencies"
+      ],
+      "operations": 15,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22211/version/3"
+    },
+    {
+      "slug": "notes",
+      "group": "notes",
+      "file": "notes.json",
+      "name": "Notes",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/notes"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22171/version/3"
+    },
+    {
+      "slug": "oauth-v1",
+      "group": "oauth",
+      "file": "oauth-v1.json",
+      "name": "Oauth",
+      "area": "Auth",
+      "version": "1",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22117/version/1"
+    },
+    {
+      "slug": "oauth-v3",
+      "group": "oauth",
+      "file": "oauth-v3.json",
+      "name": "Oauth",
+      "area": "Auth",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 3,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/67363/version/3"
+    },
+    {
+      "slug": "object-library",
+      "group": "object-library",
+      "file": "object-library.json",
+      "name": "Object Library",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/object-library"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22172/version/3"
+    },
+    {
+      "slug": "orders",
+      "group": "orders",
+      "file": "orders.json",
+      "name": "Orders",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/orders"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22174/version/3"
+    },
+    {
+      "slug": "origins",
+      "group": "origins",
+      "file": "origins.json",
+      "name": "Origins",
+      "area": "Meta",
+      "version": "1",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/43061/version/1"
+    },
+    {
+      "slug": "pages",
+      "group": "pages",
+      "file": "pages.json",
+      "name": "Pages",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/pages"
+      ],
+      "operations": 72,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22130/version/3"
+    },
+    {
+      "slug": "partner-clients",
+      "group": "partner-clients",
+      "file": "partner-clients.json",
+      "name": "Partner Clients",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22175/version/3"
+    },
+    {
+      "slug": "partner-services",
+      "group": "partner-services",
+      "file": "partner-services.json",
+      "name": "Partner Services",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22176/version/3"
+    },
+    {
+      "slug": "payment-links",
+      "group": "payment-links",
+      "file": "payment-links.json",
+      "name": "Payment Links",
+      "area": "Commerce",
+      "version": "2026-09-beta",
+      "stage": "LATEST",
+      "beta": true,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 5,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/119657/version/2026-09-beta"
+    },
+    {
+      "slug": "pipelines",
+      "group": "pipelines",
+      "file": "pipelines.json",
+      "name": "Pipelines",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/pipelines"
+      ],
+      "operations": 14,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22177/version/3"
+    },
+    {
+      "slug": "postal-mail",
+      "group": "postal-mail",
+      "file": "postal-mail.json",
+      "name": "Postal Mail",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/postal-mail"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22178/version/3"
+    },
+    {
+      "slug": "posts",
+      "group": "posts",
+      "file": "posts.json",
+      "name": "Posts",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": "STARTER",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/blogs/blog-posts"
+      ],
+      "operations": 24,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22131/version/3"
+    },
+    {
+      "slug": "products",
+      "group": "products",
+      "file": "products.json",
+      "name": "Products",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/products"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22179/version/3"
+    },
+    {
+      "slug": "projects",
+      "group": "projects",
+      "file": "projects.json",
+      "name": "Projects",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 12,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/33116/version/3"
+    },
+    {
+      "slug": "properties",
+      "group": "properties",
+      "file": "properties.json",
+      "name": "Properties",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/properties"
+      ],
+      "operations": 13,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/25174/version/3"
+    },
+    {
+      "slug": "property-validations",
+      "group": "property-validations",
+      "file": "property-validations.json",
+      "name": "Property Validations",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/property-validations"
+      ],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22181/version/3"
+    },
+    {
+      "slug": "public-app-crm-cards",
+      "group": "public-app-crm-cards",
+      "file": "public-app-crm-cards.json",
+      "name": "Public App Crm Cards",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/extensions/crm-cards"
+      ],
+      "operations": 7,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22182/version/3"
+    },
+    {
+      "slug": "public-app-feature-flags-v3",
+      "group": "public-app-feature-flags-v3",
+      "file": "public-app-feature-flags-v3.json",
+      "name": "Public App Feature Flags V3",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/crm/public-apps/migrate-a-public-app-to-projects"
+      ],
+      "operations": 10,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22183/version/3"
+    },
+    {
+      "slug": "quotes",
+      "group": "quotes",
+      "file": "quotes.json",
+      "name": "Quotes",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/quotes"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22184/version/3"
+    },
+    {
+      "slug": "scheduler-meetings",
+      "group": "scheduler-meetings",
+      "file": "scheduler-meetings.json",
+      "name": "Meetings",
+      "area": "Scheduler",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/reference/api/crm/engagements/meetings"
+      ],
+      "operations": 5,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22210/version/3"
+    },
+    {
+      "slug": "schemas",
+      "group": "schemas",
+      "file": "schemas.json",
+      "name": "Schemas",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": "ENTERPRISE",
+        "service": "ENTERPRISE",
+        "cms": "ENTERPRISE",
+        "commerce": "ENTERPRISE",
+        "crmHub": "ENTERPRISE",
+        "dataHub": "ENTERPRISE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/custom-objects"
+      ],
+      "operations": 8,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22185/version/3"
+    },
+    {
+      "slug": "send-event-completions",
+      "group": "send-event-completions",
+      "file": "send-event-completions.json",
+      "name": "Send Event Completions",
+      "area": "Events",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": "ENTERPRISE",
+        "service": "ENTERPRISE",
+        "cms": "ENTERPRISE",
+        "commerce": "ENTERPRISE",
+        "crmHub": "ENTERPRISE",
+        "dataHub": "ENTERPRISE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/analytics-and-events/custom-events/custom-event-completions"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22201/version/3"
+    },
+    {
+      "slug": "sequences",
+      "group": "sequences",
+      "file": "sequences.json",
+      "name": "Sequences",
+      "area": "Automation",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/automation/sequences"
+      ],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22121/version/4"
+    },
+    {
+      "slug": "services",
+      "group": "services",
+      "file": "services.json",
+      "name": "Services",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22186/version/3"
+    },
+    {
+      "slug": "single-send",
+      "group": "single-send",
+      "file": "single-send.json",
+      "name": "Single-send",
+      "area": "Marketing",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/emails/single-send-api"
+      ],
+      "operations": 1,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22208/version/4"
+    },
+    {
+      "slug": "site-search",
+      "group": "site-search",
+      "file": "site-search.json",
+      "name": "Site Search",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": "PROFESSIONAL",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/site-search"
+      ],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22132/version/3"
+    },
+    {
+      "slug": "source-code",
+      "group": "source-code",
+      "file": "source-code.json",
+      "name": "Source Code",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": "STARTER",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/source-code"
+      ],
+      "operations": 8,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22133/version/3"
+    },
+    {
+      "slug": "subscription-lifecycle",
+      "group": "subscription-lifecycle",
+      "file": "subscription-lifecycle.json",
+      "name": "Subscription Lifecycle",
+      "area": "CRM",
+      "version": "1",
+      "stage": "DEVELOPER_PREVIEW",
+      "beta": true,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 3,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/36416/version/1"
+    },
+    {
+      "slug": "subscriptions-v3",
+      "group": "subscriptions",
+      "file": "subscriptions-v3.json",
+      "name": "Subscriptions",
+      "area": "Communication Preferences",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "ENTERPRISE",
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/subscriptions-preferences"
+      ],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22194/version/3"
+    },
+    {
+      "slug": "subscriptions-v4",
+      "group": "subscriptions",
+      "file": "subscriptions-v4.json",
+      "name": "Subscriptions",
+      "area": "Communication Preferences",
+      "version": "4",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "STARTER",
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/subscriptions"
+      ],
+      "operations": 10,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22195/version/4"
+    },
+    {
+      "slug": "tags",
+      "group": "tags",
+      "file": "tags.json",
+      "name": "Tags",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": "STARTER",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/blogs/blog-tags"
+      ],
+      "operations": 14,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22134/version/3"
+    },
+    {
+      "slug": "tasks",
+      "group": "tasks",
+      "file": "tasks.json",
+      "name": "Tasks",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/engagements/tasks"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22187/version/3"
+    },
+    {
+      "slug": "tax-rates",
+      "group": "tax-rates",
+      "file": "tax-rates.json",
+      "name": "Tax Rates",
+      "area": "Settings",
+      "version": "1",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [],
+      "operations": 2,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22212/version/1"
+    },
+    {
+      "slug": "taxes",
+      "group": "taxes",
+      "file": "taxes.json",
+      "name": "Taxes",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/taxes"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22188/version/3"
+    },
+    {
+      "slug": "tickets",
+      "group": "tickets",
+      "file": "tickets.json",
+      "name": "Tickets",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/objects/tickets"
+      ],
+      "operations": 12,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22189/version/3"
+    },
+    {
+      "slug": "timeline",
+      "group": "timeline",
+      "file": "timeline.json",
+      "name": "Timeline",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/extensions/timeline"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22190/version/3"
+    },
+    {
+      "slug": "transactional-single-send",
+      "group": "transactional-single-send",
+      "file": "transactional-single-send.json",
+      "name": "Transactional Single Send",
+      "area": "Marketing",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/marketing/emails/transactional-emails"
+      ],
+      "operations": 6,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22209/version/3"
+    },
+    {
+      "slug": "transcriptions",
+      "group": "transcriptions",
+      "file": "transcriptions.json",
+      "name": "Transcriptions",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22191/version/3"
+    },
+    {
+      "slug": "url-mappings",
+      "group": "url-mappings",
+      "file": "url-mappings.json",
+      "name": "Url Mappings",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 4,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22135/version/3"
+    },
+    {
+      "slug": "url-redirects",
+      "group": "url-redirects",
+      "file": "url-redirects.json",
+      "name": "Url Redirects",
+      "area": "CMS",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": null,
+        "service": null,
+        "cms": "STARTER",
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/cms/url-redirects"
+      ],
+      "operations": 5,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22136/version/3"
+    },
+    {
+      "slug": "user-provisioning",
+      "group": "user-provisioning",
+      "file": "user-provisioning.json",
+      "name": "User Provisioning",
+      "area": "Settings",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/users/user-provisioning"
+      ],
+      "operations": 7,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22213/version/3"
+    },
+    {
+      "slug": "users",
+      "group": "users",
+      "file": "users.json",
+      "name": "Users",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/settings/users/user-details"
+      ],
+      "operations": 11,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22192/version/3"
+    },
+    {
+      "slug": "video-conferencing-extension",
+      "group": "video-conferencing-extension",
+      "file": "video-conferencing-extension.json",
+      "name": "Video Conferencing Extension",
+      "area": "CRM",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": null,
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/crm/extensions/video-conferencing"
+      ],
+      "operations": 3,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22193/version/3"
+    },
+    {
+      "slug": "visitor-identification",
+      "group": "visitor-identification",
+      "file": "visitor-identification.json",
+      "name": "Visitor Identification",
+      "area": "Conversations",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "PROFESSIONAL",
+        "sales": "PROFESSIONAL",
+        "service": "PROFESSIONAL",
+        "cms": "PROFESSIONAL",
+        "commerce": "PROFESSIONAL",
+        "crmHub": "PROFESSIONAL",
+        "dataHub": "PROFESSIONAL"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/conversations/visitor-identification"
+      ],
+      "operations": 1,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22198/version/3"
+    },
+    {
+      "slug": "webhooks",
+      "group": "webhooks",
+      "file": "webhooks.json",
+      "name": "Webhooks",
+      "area": "Webhooks",
+      "version": "3",
+      "stage": "STABLE",
+      "beta": false,
+      "requirements": {
+        "marketing": "FREE",
+        "sales": "FREE",
+        "service": "FREE",
+        "cms": "FREE",
+        "commerce": "FREE",
+        "crmHub": "FREE",
+        "dataHub": "FREE"
+      },
+      "documentation": [
+        "https://developers.hubspot.com/docs/guides/api/webhooks/overview"
+      ],
+      "operations": 9,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/22217/version/3"
+    },
+    {
+      "slug": "webhooks-journal",
+      "group": "webhooks-journal",
+      "file": "webhooks-journal.json",
+      "name": "Webhooks Journal",
+      "area": "Webhooks Journal",
+      "version": "2026-03",
+      "stage": "LATEST",
+      "beta": false,
+      "requirements": {
+        "marketing": null,
+        "sales": null,
+        "service": null,
+        "cms": null,
+        "commerce": null,
+        "crmHub": null,
+        "dataHub": null
+      },
+      "documentation": [],
+      "operations": 26,
+      "source": "https://api.hubspot.com/public/api/spec/v2/specs/release/113349/version/2026-03"
+    }
+  ]
+}
