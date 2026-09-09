@@ -1,42 +1,42 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ohneben/hubspot-mcp",
-  "description": "HubSpot MCP server — the whole public API (1,000+ endpoints across CRM, CMS, Marketing, Automation, Commerce & more) as safety-categorized, hub/plan-aware tools (Docker + Streamable HTTP).",
-  "status": "active",
+  "title": "HubSpot",
+  "description": "HubSpot MCP server: the whole public API (1,000+ endpoints across CRM, CMS, Marketing, Automation, Commerce and more) as safety-categorized, hub/plan-aware tools (Docker + Streamable HTTP).",
+  "version": "1.0.1",
+  "websiteUrl": "https://github.com/ohneben/Hubspot-MCP#readme",
   "repository": {
     "url": "https://github.com/ohneben/Hubspot-MCP",
     "source": "github"
   },
-  "version": "1.0.1",
   "packages": [
     {
-      "registry_type": "oci",
-      "registry_base_url": "https://ghcr.io",
-      "identifier": "ohneben/hubspot-mcp",
-      "version": "1.0.1",
+      "registryType": "oci",
+      "identifier": "ghcr.io/ohneben/hubspot-mcp:1.0.1",
+      "runtimeHint": "docker",
       "transport": {
         "type": "streamable-http"
       },
-      "environment_variables": [
+      "environmentVariables": [
         {
           "name": "HUBSPOT_ACCESS_TOKEN",
           "description": "HubSpot private-app access token (pat-...) from Settings -> Integrations -> Private Apps (an OAuth access token also works).",
-          "is_required": true,
-          "is_secret": true,
-          "format": "string"
+          "format": "string",
+          "isRequired": true,
+          "isSecret": true
         },
         {
           "name": "HUBSPOT_BASE_URL",
           "description": "API host. Default https://api.hubapi.com; use https://api-eu1.hubapi.com for EU data residency portals.",
-          "is_required": false,
-          "format": "string"
+          "format": "string",
+          "isRequired": false
         },
         {
-          "name": "MCP_SHARED_TOKEN",
-          "description": "Optional bearer token required on the /mcp endpoint. Empty = open (localhost only).",
-          "is_required": false,
-          "is_secret": true,
-          "format": "string"
+          "name": "MCP_AUTH_TOKEN",
+          "description": "Bearer token required on the /mcp endpoint. Required whenever HOST is not a loopback address, otherwise the server refuses to start.",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": true
         }
       ]
     }

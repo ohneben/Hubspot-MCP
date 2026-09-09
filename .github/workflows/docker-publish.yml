@@ -1,12 +1,24 @@
-name: Publish Docker image
+# A release is a new tag vX.Y.Z and nothing else. The version comes from that
+# tag and is stamped from here into the image, package.json and the registry
+# entry. Once the release is through, the "sync-version" job writes the number
+# back to main and moves the tag onto that commit, so the repository always
+# states the version it last published, never a placeholder and never a stale
+# number. No version is ever bumped by hand.
+name: Publish image & MCP Registry entry
 
 on:
   push:
     branches: [main]
     tags: ['v*']
-  release:
-    types: [published]
+  # Manual run, to (re-)publish a version without cutting a new tag.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the image tag and registry entry, e.g. 1.0.3'
+        required: true
+        type: string
 
+# Never run more than one publish per ref at a time.
 concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
@@ -16,14 +28,72 @@ permissions:
   packages: write
 
 jobs:
+  # The release version is derived here once, from the tag, and then reused by
+  # every job below. That way a release lives in exactly one place: the tag.
+  version:
+    name: determine version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+      is_release: ${{ steps.pick.outputs.is_release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from the ref
+        id: pick
+        env:
+          # Via the environment rather than interpolated into the script text,
+          # so the input cannot end up being run as shell code.
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          IS_RELEASE=true
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            case "$GITHUB_REF" in
+              refs/tags/v*)
+                VERSION="${GITHUB_REF#refs/tags/v}"
+                ;;
+              *)
+                # Not a release: the last released version plus the commit this
+                # build came from. package.json always carries a real version,
+                # so a dev build is marked as one without inventing a
+                # placeholder number like 0.0.0.
+                VERSION="$(jq -r .version package.json)-dev.g$(printf '%s' "$GITHUB_SHA" | cut -c1-7)"
+                IS_RELEASE=false
+                ;;
+            esac
+          fi
+          case "$VERSION" in
+            ''|*[!0-9A-Za-z.+-]*)
+              echo "Unusable version: '$VERSION'" >&2
+              exit 1
+              ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION (release: $IS_RELEASE)"
+
   publish:
     name: build & push to GHCR
+    needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
+
+      # package.json is not the source of truth for the version; the tag is.
+      # Stamping it here is what the server reports over MCP at runtime. The
+      # same number is written back to main by "sync-version" once the release
+      # is through, so no version is ever bumped by hand.
+      - name: Stamp the version into package.json
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          echo "package.json is now at $VERSION"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -31,8 +101,9 @@ jobs:
 
       - name: Derive image tags & labels
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
+          # GHCR requires a lowercase image path.
           images: ghcr.io/ohneben/hubspot-mcp
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
@@ -40,12 +111,13 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
+            type=raw,value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.is_release == 'true' }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -53,3 +125,128 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  publish-mcp-registry:
+    name: publish to MCP Registry
+    needs: [version, publish]
+    # The registry versions per release, not per commit.
+    if: needs.version.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # for the OIDC login to the registry
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Pin server.json to the released version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '
+            .version = $v
+            | .packages[0].identifier = "ghcr.io/ohneben/hubspot-mcp:" + $v
+          ' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          cat server.json
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server to MCP Registry
+        run: |
+          set +e
+          OUTPUT=$(./mcp-publisher publish 2>&1)
+          STATUS=$?
+          echo "$OUTPUT"
+          if [ "$STATUS" -ne 0 ]; then
+            case "$OUTPUT" in
+              *'cannot publish duplicate version'*)
+                echo "::notice::This version is already in the registry, nothing to do."
+                exit 0
+                ;;
+            esac
+            exit "$STATUS"
+          fi
+
+  # Once the release has actually shipped, write its version back into the
+  # repository and pull the tag onto that commit. This is what keeps
+  # package.json and server.json from ever going stale.
+  #
+  # Pushes made with the built-in GITHUB_TOKEN do not start new workflow runs,
+  # so neither the commit below nor the moved tag can loop back into this
+  # workflow or re-tag the image.
+  sync-version:
+    name: write the released version back to main
+    needs: [version, publish, publish-mcp-registry]
+    if: needs.version.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # Full history and tags, so the tag below can be compared and moved.
+          fetch-depth: 0
+
+      - name: Stamp the released version into the repository
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          jq --arg v "$VERSION" '
+            .version = $v
+            | .packages[0].identifier = "ghcr.io/ohneben/hubspot-mcp:" + $v
+          ' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          git --no-pager diff --stat
+
+      - name: Commit to main and move the tag onto that commit
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if git diff --quiet -- package.json package-lock.json server.json; then
+            echo "::notice::$VERSION is already written down in the repository."
+            exit 0
+          fi
+
+          # Only re-point the tag when it is still the tip of main. If main has
+          # moved on since the tag was cut, moving it would silently pull later
+          # commits into the release, so leave the tag alone and say so.
+          TAGGED="$(git rev-parse -q --verify "refs/tags/v$VERSION^{commit}" || true)"
+          MOVE_TAG=false
+          if [ -n "$TAGGED" ] && [ "$TAGGED" = "$(git rev-parse HEAD)" ]; then
+            MOVE_TAG=true
+          fi
+
+          git add package.json package-lock.json server.json
+          git commit -m "chore(release): set version to $VERSION"
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              break
+            fi
+            if [ "$attempt" = 5 ]; then
+              echo "::error::Could not push the version bump to main." >&2
+              exit 1
+            fi
+            echo "main moved while we were pushing, rebasing (attempt $attempt)"
+            sleep $(( attempt * 2 ))
+            git pull --rebase origin main
+          done
+
+          if [ "$MOVE_TAG" = true ]; then
+            git tag -f "v$VERSION" HEAD
+            git push -f origin "refs/tags/v$VERSION"
+            echo "::notice::v$VERSION now points at the commit that carries $VERSION."
+          else
+            echo "::warning::main is ahead of v$VERSION, so the tag was left where it is. main now carries $VERSION."
+          fi

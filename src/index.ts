@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema,
+  isInitializeRequest,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { callOperation } from "./client.js";
 import { loadConfig, type ServerConfig } from "./config.js";
 import { loadAllSpecs, type Operation } from "./openapi.js";
@@ -22,9 +27,40 @@ import {
   handleGetEndpoint,
   handleSearchEndpoints,
 } from "./discovery.js";
+import {
+  bearerFrom,
+  healthHostAllowlist,
+  hostAllowed,
+  hostAllowlist,
+  loadHttpConfig,
+  startupRefusal,
+  tokenMatches,
+  weakTokenWarning,
+} from "./http.js";
 
 const SERVER_NAME = "hubspot-mcp";
-const SERVER_VERSION = "1.0.1";
+
+const FALLBACK_VERSION = "unknown";
+
+/**
+ * The version reported over MCP. It comes from package.json, which CI stamps
+ * from the release tag and writes back to main, so the number is never
+ * maintained by hand and never drifts from what was actually published. It
+ * used to be a second literal in this file, which is why it still said 1.0.1
+ * after the repository had moved on.
+ */
+function readPackageVersion(): string {
+  try {
+    const pkg = createRequire(import.meta.url)("../package.json") as {
+      version?: string;
+    };
+    return pkg.version ?? FALLBACK_VERSION;
+  } catch {
+    return FALLBACK_VERSION;
+  }
+}
+
+const SERVER_VERSION = readPackageVersion();
 
 interface Registry {
   /** Endpoint tools generated from the specs (post-filtering). */
@@ -158,9 +194,31 @@ function buildServer(registry: Registry, config: ServerConfig): Server {
   return server;
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+class BodyTooLarge extends Error {}
+
+/**
+ * Reads the request body, refusing anything over `limitBytes`. Without the
+ * limit the whole request is buffered in memory, and with no token set anyone
+ * who could reach the port could send a body of any size.
+ */
+async function readBody(
+  req: IncomingMessage,
+  limitBytes: number,
+): Promise<unknown> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let size = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    size += buf.length;
+    if (size > limitBytes) {
+      // Throwing out of `for await` already destroys the request and nulls its
+      // socket, so neither req.pause() nor a later req.destroy() does anything.
+      // The response socket is still alive, which is all the caller needs to
+      // write the 413.
+      throw new BodyTooLarge(`Request body exceeds ${limitBytes} bytes`);
+    }
+    chunks.push(buf);
+  }
   if (chunks.length === 0) return undefined;
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw) return undefined;
@@ -179,13 +237,93 @@ async function runStdio(registry: Registry, config: ServerConfig) {
 }
 
 async function runHttp(registry: Registry, config: ServerConfig) {
-  const port = parseInt(process.env.PORT ?? "8765", 10);
-  const host = process.env.HOST ?? "0.0.0.0";
-  const path = process.env.MCP_HTTP_PATH ?? "/mcp";
-  const sharedToken = process.env.MCP_SHARED_TOKEN?.trim();
+  const cfg = loadHttpConfig();
 
-  type Session = { server: Server; transport: StreamableHTTPServerTransport };
+  // A server reachable beyond this machine must require a token. This endpoint
+  // can read, write and delete across the whole HubSpot account, so starting it
+  // wide open is refused rather than warned about.
+  const refusal = startupRefusal(cfg);
+  if (refusal) {
+    console.error(refusal);
+    process.exit(1);
+  }
+  if (cfg.portFellBack) {
+    console.error(
+      `${SERVER_NAME}: WARNING - PORT=${process.env.PORT} is not a usable ` +
+        `port number, falling back to ${cfg.port}. A platform that injects ` +
+        `PORT will probe the value it injected, not this one.`,
+    );
+  }
+  const weak = weakTokenWarning(cfg);
+  if (weak) console.error(`${SERVER_NAME}: ${weak}`);
+  if (!cfg.authToken && cfg.allowInsecure) {
+    console.error(
+      `${SERVER_NAME}: WARNING - MCP_ALLOW_INSECURE is set and no ` +
+        "MCP_AUTH_TOKEN is configured. Anyone who can reach this port has " +
+        "full access to the HubSpot account data.",
+    );
+  }
+
+  const allowlist = hostAllowlist(cfg);
+  const healthAllowlist = healthHostAllowlist(cfg);
+
+  type Session = {
+    server: Server;
+    transport: StreamableHTTPServerTransport;
+    lastSeen: number;
+    /** Open SSE streams; a session serving one is in use, however quiet. */
+    streams: number;
+  };
   const sessions = new Map<string, Session>();
+
+  const drop = (id: string) => {
+    const s = sessions.get(id);
+    if (!s) return;
+    sessions.delete(id);
+    void Promise.resolve(s.transport.close()).catch(() => {});
+  };
+
+  // Sessions were previously only removed when the transport closed, and each
+  // one holds a full Server built over ~1,000 endpoint tools. A client that
+  // reconnects instead of closing grew the map until the process died.
+  const sweep = setInterval(() => {
+    const cutoff = Date.now() - cfg.sessionTtlMs;
+    for (const [id, s] of sessions) {
+      if (s.streams === 0 && s.lastSeen < cutoff) drop(id);
+    }
+  }, 60_000);
+  sweep.unref();
+
+  const evictOldest = () => {
+    let victim: string | undefined;
+    let oldest = Infinity;
+    let victimStreaming = true;
+    for (const [id, s] of sessions) {
+      const streaming = s.streams > 0;
+      // A non-streaming candidate always beats a streaming one.
+      if (victimStreaming && !streaming) {
+        victim = id;
+        oldest = s.lastSeen;
+        victimStreaming = false;
+        continue;
+      }
+      if (streaming === victimStreaming && s.lastSeen < oldest) {
+        victim = id;
+        oldest = s.lastSeen;
+      }
+    }
+    if (victim) drop(victim);
+  };
+
+  const send = (res: ServerResponse, status: number, payload: unknown) => {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(payload));
+  };
+  const rpcError = (code: number, message: string) => ({
+    jsonrpc: "2.0",
+    error: { code, message },
+    id: null,
+  });
 
   const httpServer = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (!req.url) {
@@ -193,47 +331,87 @@ async function runHttp(registry: Registry, config: ServerConfig) {
       return;
     }
 
-    if (req.method === "GET" && req.url === "/health") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          status: "ok",
-          server: SERVER_NAME,
-          tools: registry.exposedTools.length,
-          endpoints: registry.endpointTools.length,
-          mode: config.toolMode,
-        }),
-      );
+    // 1. DNS-rebinding protection, on every route: /health used to answer with
+    //    any Host header and hand out the server name, tool count and mode.
+    const listForRequest =
+      req.method === "GET" && (req.url === "/health" || req.url.startsWith("/health?"))
+        ? healthAllowlist
+        : allowlist;
+    if (listForRequest && !hostAllowed(req.headers.host, listForRequest)) {
+      send(res, 403, rpcError(-32000, `Invalid Host: ${req.headers.host ?? "(missing)"}`));
       return;
     }
 
-    if (!req.url.startsWith(path)) {
-      res.writeHead(404, { "Content-Type": "text/plain" });
-      res.end(`Not found. MCP endpoint is ${path}`);
-      return;
-    }
-
-    if (sharedToken) {
-      const auth = req.headers["authorization"];
-      const provided = typeof auth === "string" ? auth.replace(/^Bearer\s+/i, "").trim() : "";
-      if (provided !== sharedToken) {
-        res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Unauthorized" }));
-        return;
+    // Parse once: req.url carries the query string, and startsWith() turned
+    // /mcpXYZ and /mcp-evil into fully working MCP endpoints, which silently
+    // defeats any WAF rule, proxy route or rate limit scoped to exactly /mcp.
+    const pathname = (() => {
+      try {
+        return new URL(req.url!, "http://localhost").pathname;
+      } catch {
+        return req.url!;
       }
+    })();
+    const isMcpPath = pathname === cfg.path || pathname.startsWith(cfg.path + "/");
+
+    // Liveness only. Behind the Host check, in front of the auth gate so a
+    // platform health check needs no token. The tool count and mode it used to
+    // report told an unauthenticated caller how the server was configured.
+    if (req.method === "GET" && pathname === "/health") {
+      send(res, 200, { status: "ok", server: SERVER_NAME });
+      return;
+    }
+
+    if (!isMcpPath) {
+      send(res, 404, rpcError(-32601, `Not found. MCP endpoint is ${cfg.path}`));
+      return;
+    }
+
+    // 2. Shared secret, still before the body is read. The comparison is
+    //    constant-time; `!==` on the raw strings leaked the token prefix.
+    if (cfg.authToken && !tokenMatches(bearerFrom(req.headers.authorization), cfg.authToken)) {
+      send(res, 401, rpcError(-32001, "Unauthorized"));
+      return;
     }
 
     try {
       const sessionIdHeader = req.headers["mcp-session-id"];
       const sessionId = Array.isArray(sessionIdHeader) ? sessionIdHeader[0] : sessionIdHeader;
-      let session: Session | undefined = sessionId ? sessions.get(sessionId) : undefined;
 
-      if (!session) {
+      // 3. Body first, so an initialize can be recognised without allocating.
+      let body: unknown;
+      if (req.method === "POST") {
+        try {
+          body = await readBody(req, cfg.bodyLimitBytes);
+        } catch (err) {
+          if (err instanceof BodyTooLarge) {
+            send(res, 413, rpcError(-32600, `Request body exceeds the configured limit of ${cfg.bodyLimitBytes} bytes`));
+            return;
+          }
+          throw err;
+        }
+      }
+
+      let session: Session | undefined;
+
+      if (sessionId) {
+        session = sessions.get(sessionId);
+        if (!session) {
+          // 404, not a silent new session: this used to build a fresh Server
+          // for any session id it did not recognise, so a client that sent a
+          // stale id got a working but empty session instead of being told to
+          // re-initialize, and nothing capped how many were created.
+          send(res, 404, rpcError(-32001, "Session not found"));
+          return;
+        }
+        session.lastSeen = Date.now();
+      } else if (req.method === "POST" && isInitializeRequest(body)) {
+        if (sessions.size >= cfg.maxSessions) evictOldest();
         const server = buildServer(registry, config);
-        const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+        const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newId) => {
-            sessions.set(newId, { server, transport });
+            sessions.set(newId, { server, transport, lastSeen: Date.now(), streams: 0 });
           },
         });
         transport.onclose = () => {
@@ -241,27 +419,60 @@ async function runHttp(registry: Registry, config: ServerConfig) {
           if (id) sessions.delete(id);
         };
         await server.connect(transport);
-        session = { server, transport };
+        session = { server, transport, lastSeen: Date.now(), streams: 0 };
+      } else {
+        send(res, req.method === "POST" ? 400 : 404, rpcError(-32000, "Bad Request: no valid session ID provided."));
+        return;
       }
 
-      const body = req.method === "POST" ? await readBody(req) : undefined;
+      // A GET is the SSE stream and stays open; count it so the idle sweep
+      // leaves the session alone while it is genuinely in use.
+      if (req.method === "GET" && sessionId) {
+        const held = session;
+        held.streams += 1;
+        res.on("close", () => {
+          held.streams = Math.max(0, held.streams - 1);
+          held.lastSeen = Date.now();
+        });
+      }
+
       await session.transport.handleRequest(req, res, body);
     } catch (err) {
       console.error("Request handling error:", err);
       if (!res.headersSent) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Internal server error" }));
+        send(res, 500, rpcError(-32603, "Internal server error"));
       } else {
         res.end();
       }
     }
   });
 
-  httpServer.listen(port, host, () => {
+  // Without this a failed bind was silent: nothing listened, nothing was
+  // logged, and the process stayed up as if it had started.
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    const hint =
+      err.code === "EADDRINUSE"
+        ? ` Port ${cfg.port} is already in use.`
+        : err.code === "EACCES"
+          ? ` No permission to bind port ${cfg.port}.`
+          : err.code === "ENOTFOUND" || err.code === "EADDRNOTAVAIL"
+            ? ` HOST=${cfg.host} is not an address this machine can bind.`
+            : "";
     console.error(
-      `${SERVER_NAME} (http) ready on http://${host}:${port}${path}  —  ${registry.exposedTools.length} tools registered (${registry.endpointTools.length} endpoints, mode: ${config.toolMode}).`,
+      `Fatal: could not listen on ${cfg.host}:${cfg.port}.${hint} (${err.code ?? err.message})`,
     );
-    console.error(sharedToken ? "Bearer auth: required (MCP_SHARED_TOKEN set)." : "Bearer auth: DISABLED (MCP_SHARED_TOKEN not set).");
+    process.exit(1);
+  });
+
+  httpServer.listen(cfg.port, cfg.host, () => {
+    console.error(
+      `${SERVER_NAME} (http) ready on http://${cfg.host}:${cfg.port}${cfg.path}  -  ${registry.exposedTools.length} tools registered (${registry.endpointTools.length} endpoints, mode: ${config.toolMode}).`,
+    );
+    if (allowlist) {
+      console.error(`${SERVER_NAME}: Host header restricted to ${allowlist.join(", ")}`);
+    }
+    if (cfg.authToken) console.error("Bearer auth: required (MCP_AUTH_TOKEN set).");
+    else console.error("Bearer auth: DISABLED (MCP_AUTH_TOKEN not set).");
   });
 
   const shutdown = (signal: string) => {

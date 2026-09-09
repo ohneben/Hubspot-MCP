@@ -2,9 +2,18 @@
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ohneben-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/ohneben)
 
+---
+
+#### License & checks
+
 [![CI](https://github.com/ohneben/Hubspot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/ohneben/Hubspot-MCP/actions/workflows/ci.yml)
-[![Publish Docker image](https://github.com/ohneben/Hubspot-MCP/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ohneben/Hubspot-MCP/actions/workflows/docker-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE.md)
+
+#### MCP registries
+
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.ohneben%252Fhubspot-mcp%2Fversions%2Flatest&query=%24.server.version&prefix=v&label=MCP%20Registry&color=blue&logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ohneben%2Fhubspot-mcp/versions/latest)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/ohneben/hubspot-mcp)
+[![Hubspot-MCP MCP server](https://glama.ai/mcp/servers/ohneben/Hubspot-MCP/badges/score.svg)](https://glama.ai/mcp/servers/ohneben/Hubspot-MCP)
 
 **The most complete HubSpot MCP server there is.** Run your entire
 [HubSpot](https://www.hubspot.com/) account in plain language from **Claude**,
@@ -157,7 +166,8 @@ to your token. This server is built around that reality:
 ```bash
 cp .env.example .env
 # edit .env → set HUBSPOT_ACCESS_TOKEN
-#           → set MCP_SHARED_TOKEN to a long random string if reachable beyond localhost
+#           → set MCP_AUTH_TOKEN. REQUIRED unless HOST is a loopback address,
+#             otherwise the server refuses to start: MCP_AUTH_TOKEN=$(openssl rand -hex 32)
 ```
 
 **2. Start the server:**
@@ -191,14 +201,15 @@ curl -s http://localhost:8765/health
         "args": [
           "mcp-remote",
           "http://localhost:8765/mcp",
-          "--header", "Authorization: Bearer YOUR_MCP_SHARED_TOKEN"
+          "--header", "Authorization: Bearer YOUR_MCP_AUTH_TOKEN"
         ]
       }
     }
   }
   ```
 
-  (Drop the `--header` line if you left `MCP_SHARED_TOKEN` empty.)
+  (Drop the `--header` line only if the server runs without a token, which it
+  allows on a loopback bind alone.)
 
 - **Claude Code** — one command:
 
@@ -260,7 +271,12 @@ Everything is set in `.env` (copied from `.env.example`):
 | `PORT` | — | `8765` | HTTP listen port |
 | `HOST` | — | `0.0.0.0` | HTTP bind address |
 | `MCP_HTTP_PATH` | — | `/mcp` | HTTP MCP route |
-| `MCP_SHARED_TOKEN` | — | _(off)_ | Require `Authorization: Bearer <token>` on `/mcp` |
+| `MCP_AUTH_TOKEN` | ⚠️ | _(off)_ | Require `Authorization: Bearer <token>` on `/mcp`. **Required** when `HOST` is not a loopback address, otherwise the server refuses to start. Renamed from `MCP_SHARED_TOKEN` in 1.1.0 |
+| `MCP_ALLOWED_HOSTS` | — | _(derived)_ | Comma-separated hostnames the `Host` header may carry. Defaults to the loopback names on a loopback bind, and to no check behind a reverse proxy |
+| `MCP_ALLOW_INSECURE` | — | `0` | Start without a token on a non-loopback bind. Only for a port that genuinely is not reachable by anyone else |
+| `MCP_BODY_LIMIT` | — | `25mb` | Largest accepted request body |
+| `MCP_SESSION_TTL` | — | `1800` | Seconds an idle session is kept before it is swept |
+| `MCP_MAX_SESSIONS` | — | `256` | Concurrent sessions before the least recently used one is evicted |
 | `HUBSPOT_MAX_REQUESTS` | — | `100` | Client-side requests per window (`0` disables throttling) |
 | `HUBSPOT_RATE_WINDOW_MS` | — | `10000` | Rate-limit window in ms (default: 100 req / 10 s) |
 | `HUBSPOT_SEARCH_MAX_REQUESTS` | — | `4` | Extra throttle for `/search` endpoints (`0` disables) |
@@ -488,9 +504,11 @@ publish a Docker image to the GitHub Container Registry.
 - Your access token lives only in `.env`, which is git-ignored. **Never commit
   real secrets.** The token grants whatever its scopes allow — if it leaks,
   rotate it in **Settings → Integrations → Private Apps**.
-- The HTTP endpoint is unauthenticated by default (fine on localhost). To expose
-  it beyond your machine, set `MCP_SHARED_TOKEN` and send it as an
-  `Authorization: Bearer <token>` header — ideally behind TLS.
+- The HTTP endpoint refuses to start unauthenticated once it is bound beyond
+  this machine. Set `MCP_AUTH_TOKEN` (`openssl rand -hex 32`) and send it as an
+  `Authorization: Bearer <token>` header, ideally behind TLS. A loopback bind
+  still needs no token, and is additionally protected against DNS rebinding by
+  a `Host` header check.
 - Destructive tools (delete / **merge** / **GDPR purge**) and **send** tools
   (marketing & transactional email, sequences) carry the right annotations so a
   well-behaved host prompts before acting — keep that confirmation on, or run
