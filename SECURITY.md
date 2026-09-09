@@ -53,11 +53,13 @@ transactional email, sequence enrollments), **merge records irreversibly** and
   `Authorization: Bearer` header on every outgoing request; the MCP client (and
   the LLM behind it) only ever sees tool inputs and API responses, never your
   token.
-- **The HTTP endpoint is unauthenticated by default**, which is fine for
-  localhost-only use (the bundled `docker-compose.yml` binds to `127.0.0.1`). If
-  you expose it beyond your machine, set `MCP_SHARED_TOKEN` and require it via an
-  `Authorization: Bearer <token>` header. Prefer running it behind TLS (a reverse
-  proxy) rather than exposing the raw port.
+- **The HTTP endpoint refuses to start unauthenticated** once it is bound to
+  anything but a loopback address. Set `MCP_AUTH_TOKEN` (`openssl rand -hex 32`)
+  and send it as an `Authorization: Bearer <token>` header. A localhost-only
+  bind still needs no token (the bundled `docker-compose.yml` binds to
+  `127.0.0.1`) and is protected against DNS rebinding by a `Host` header check.
+  Prefer running it behind TLS (a reverse proxy) rather than exposing the raw
+  port. The variable was named `MCP_SHARED_TOKEN` before 1.1.0.
 - **Mind the destructive and outbound tools.** Deletes, batch archives, record
   **merges** (cannot be undone), **GDPR purges** (skip the recycle bin) and the
   email **send** tools carry `destructiveHint` / non-`readOnlyHint` annotations
