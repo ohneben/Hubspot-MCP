@@ -1,38 +1,34 @@
-# syntax=docker/dockerfile:1.7
-
-# ── Builder stage: compile TypeScript ─────────────────────────────────
-FROM node:20-alpine AS builder
+# ---- build stage ----
+FROM node:22-alpine AS build
 WORKDIR /app
-
-# Install all deps (including dev) for the build
 COPY package.json package-lock.json* ./
 RUN npm ci
-
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# Prune dev dependencies so we copy only what's needed
-RUN npm prune --omit=dev
-
-
-# ── Runtime stage: minimal image ─────────────────────────────────────
-FROM node:20-alpine AS runtime
+# ---- runtime stage ----
+FROM node:22-alpine AS runtime
 WORKDIR /app
-ENV NODE_ENV=production \
-    MCP_TRANSPORT=http \
-    HOST=0.0.0.0 \
-    PORT=8765
+ENV NODE_ENV=production
+# Default to the hosted HTTP transport in containers.
+ENV MCP_TRANSPORT=http
+ENV PORT=8765
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./package.json
+# Ownership proof for the MCP Registry: this must match the "name" field in
+# server.json exactly, otherwise the registry rejects the image.
+LABEL io.modelcontextprotocol.server.name="io.github.ohneben/hubspot-mcp"
+
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
 COPY spec ./spec
 
-EXPOSE 8765
+# Run as the unprivileged node user shipped with the image.
+USER node
 
-# Simple healthcheck against the /health endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+EXPOSE 8765
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- "http://127.0.0.1:${PORT:-8765}/health" || exit 1
 
 CMD ["node", "dist/index.js"]
