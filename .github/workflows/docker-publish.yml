@@ -37,7 +37,7 @@ jobs:
       version: ${{ steps.pick.outputs.version }}
       is_release: ${{ steps.pick.outputs.is_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Derive version from the ref
         id: pick
@@ -79,7 +79,7 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # package.json is not the source of truth for the version; the tag is.
       # Stamping it here is what the server reports over MCP at runtime. The
@@ -136,7 +136,7 @@ jobs:
       contents: read
       id-token: write # for the OIDC login to the registry
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install mcp-publisher
         run: |
@@ -187,7 +187,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           # Full history and tags, so the tag below can be compared and moved.
