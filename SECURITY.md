@@ -49,8 +49,10 @@ transactional email, sequence enrollments), **merge records irreversibly** and
   The token grants whatever its scopes allow.
 - **Scope the token at the source.** A service key or private app only receives
   the scopes you tick — grant read scopes for reporting deployments and add write scopes
-  deliberately. The `hubspot_get_capabilities` tool shows exactly which tool
-  groups the current scopes unlock.
+  deliberately. The access check at startup and the `hubspot_get_capabilities`
+  tool show which API groups the current token can use. The check only makes
+  read calls (up to about 30 per start); `HUBSPOT_CAPABILITY_CHECK=false` turns
+  it off.
 - **Credentials never reach the model.** The server injects the
   `Authorization: Bearer` header on every outgoing request; the MCP client (and
   the LLM behind it) only ever sees tool inputs and API responses, never your

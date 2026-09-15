@@ -169,7 +169,7 @@ export interface GroupReport {
   scopesNeeded?: string[];
   access: GroupAccess;
   accessReason: string;
-  probe?: { status: number; ok: boolean; endpoint: string } | { skipped: string };
+  probe?: { status: number; ok: boolean; endpoint: string; category?: string; message?: string } | { skipped: string };
 }
 
 export interface CapabilityProfile {
@@ -181,17 +181,36 @@ export interface CapabilityProfile {
   notes: string[];
 }
 
-export type ProbeFn = (cfg: ServerConfig, op: Operation, args: unknown) => Promise<{ status: number; ok: boolean }>;
+export type ProbeFn = (
+  cfg: ServerConfig,
+  op: Operation,
+  args: unknown,
+) => Promise<{ status: number; ok: boolean; body?: unknown }>;
 
-/** Pick a cheap, parameter-free GET to probe a group with. */
-export function pickProbeOperation(ops: Operation[]): Operation | undefined {
+/**
+ * Fixed path values for groups whose only collection read needs one. The
+ * appointments API is served per object type (checked against a live portal);
+ * HubSpot's forecasts spec names `forecast` as the object.
+ */
+const PROBE_PATH_VALUES: Record<string, Record<string, string>> = {
+  appointments: { objectType: "appointments" },
+  forecasts: { objectType: "forecast" },
+};
+
+/** Pick a cheap GET to probe a group with: no required parameters beyond the known path values. */
+export function pickProbeOperation(ops: Operation[], pathValues: Record<string, string> = {}): Operation | undefined {
   const candidates = ops
-    .filter((op) => op.method === "get" && !op.path.includes("{"))
-    .filter((op) => op.parameters.every((p) => !p.required || p.in !== "path"))
-    .filter((op) => op.parameters.filter((p) => p.required).length === 0);
+    .filter((op) => op.method === "get")
+    .filter((op) => [...op.path.matchAll(/\{([^}]+)\}/g)].every((hit) => hit[1] in pathValues))
+    .filter((op) => op.parameters.filter((p) => p.required).every((p) => p.in === "path" && p.name in pathValues));
   // Shortest path ≈ the collection root — the cheapest representative read.
   return candidates.sort((a, b) => a.path.length - b.path.length)[0];
 }
+
+const clipMessage = (message: string, max = 160) => (message.length > max ? `${message.slice(0, max)}…` : message);
+
+/** Paid plan tiers, as opposed to hub availability on the free tier. */
+const PAID_TIER = /Starter|Professional|Enterprise/;
 
 /** A group whose published plan tier or beta status can block a token that has the scopes. */
 function isGated(entry: CatalogEntry): boolean {
@@ -199,13 +218,20 @@ function isGated(entry: CatalogEntry): boolean {
   return Boolean(plan && !plan.startsWith("any")) || entry.beta;
 }
 
-function decideAccess(
-  report: GroupReport,
-  gated: boolean,
-  scopesKnown: boolean,
-  unlocked: number,
-  total: number,
-): Pick<GroupReport, "access" | "accessReason"> {
+interface AccessContext {
+  gated: boolean;
+  scopesKnown: boolean;
+  granted: Set<string>;
+  /** The token could be introspected, so a 401 on one API is about that API. */
+  tokenUsable: boolean;
+  /** Whether the token holds the scopes the probed endpoint lists (undefined when unknown). */
+  probeScopesHeld?: boolean;
+  unlocked: number;
+  total: number;
+}
+
+function decideAccess(report: GroupReport, ctx: AccessContext): Pick<GroupReport, "access" | "accessReason"> {
+  const { gated, scopesKnown, granted, tokenUsable, probeScopesHeld, unlocked, total } = ctx;
   if (scopesKnown && unlocked === 0) {
     const needed = report.scopesNeeded ? ` (for example ${report.scopesNeeded.join(", ")})` : "";
     return { access: "missing_scopes", accessReason: `The token has none of the scopes this group needs${needed}.` };
@@ -213,17 +239,68 @@ function decideAccess(
   const partial = scopesKnown && unlocked < total ? ` Its scopes cover ${unlocked} of ${total} endpoints.` : "";
   const probe = report.probe;
   if (probe && "status" in probe) {
-    if (probe.ok) return { access: "available", accessReason: `Verified: ${probe.endpoint} returned ${probe.status}.${partial}` };
+    const said = probe.message ? ` HubSpot says: "${clipMessage(probe.message)}"` : "";
+    if (probe.ok) {
+      // A read can succeed on a plan that still refuses writes (schemas list works below Enterprise).
+      const writes =
+        report.plan && PAID_TIER.test(report.plan)
+          ? ` That proves read access only; writes can still be refused without ${report.plan}.`
+          : "";
+      return { access: "available", accessReason: `Verified: ${probe.endpoint} returned ${probe.status}.${writes}${partial}` };
+    }
+    if (probe.status === 403) {
+      const message = probe.message ?? "";
+      if (/available for public use/i.test(message)) {
+        return {
+          access: "blocked",
+          accessReason: `${probe.endpoint} returned 403: HubSpot does not offer this API's scope to service keys or private apps.${said}`,
+        };
+      }
+      // e.g. "Insufficient scopes, requires one of: [event-detail-read,web-analytics-api-access]"
+      const named = (message.match(/requires one of:\s*\[([^\]]*)\]/i)?.[1] ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (named.length > 0 && !named.some((s) => granted.has(s))) {
+        return {
+          access: "missing_scopes",
+          accessReason: `${probe.endpoint} needs one of ${named.join(", ")}, which the token does not have.`,
+        };
+      }
+      if (probe.category === "MISSING_SCOPES" && probeScopesHeld === false) {
+        return {
+          access: "missing_scopes",
+          accessReason: `${probe.endpoint} returned 403 MISSING_SCOPES and the token lacks the scopes this endpoint lists.${said}`,
+        };
+      }
+      if (probe.category === "MISSING_SCOPES") {
+        // Seen live for leads, goals and feedback submissions: the token held the
+        // object's read scope and HubSpot still answered MISSING_SCOPES.
+        return {
+          access: "blocked",
+          accessReason: `${probe.endpoint} returned 403 MISSING_SCOPES although the token holds the scopes this endpoint lists, which usually means the portal's plan does not include it${report.plan ? ` (needs ${report.plan})` : ""}.${said}`,
+        };
+      }
+    }
     if (probe.status === 403) {
       return {
         access: "blocked",
-        accessReason: `${probe.endpoint} returned 403: the portal's plan${report.plan ? ` (needs ${report.plan})` : ""} or the token user's permissions do not allow it.`,
+        accessReason: `${probe.endpoint} returned 403: the portal's plan${report.plan ? ` (needs ${report.plan})` : ""} or the token user's permissions do not allow it.${said}`,
+      };
+    }
+    if (probe.status === 401 && tokenUsable) {
+      return {
+        access: "blocked",
+        accessReason: `${probe.endpoint} returned 401 although the token works for other APIs, so this API does not accept this kind of token (it may need an OAuth app token).${said}`,
       };
     }
     if (probe.status === 404 && report.beta) {
-      return { access: "blocked", accessReason: `${probe.endpoint} returned 404: this beta API is probably not enabled for the portal.` };
+      return { access: "blocked", accessReason: `${probe.endpoint} returned 404: this beta API is probably not enabled for the portal.${said}` };
     }
-    return { access: "unverified", accessReason: `${probe.endpoint} returned ${probe.status ? `HTTP ${probe.status}` : "no response"}.${partial}` };
+    return {
+      access: "unverified",
+      accessReason: `${probe.endpoint} returned ${probe.status ? `HTTP ${probe.status}` : "no response"}.${said}${partial}`,
+    };
   }
   if (gated) {
     const skipped = probe && "skipped" in probe ? ` (${probe.skipped})` : "";
@@ -302,22 +379,52 @@ export async function checkCapabilities(
         const wantProbe =
           !ruledOutByScopes &&
           ((options.probeGated !== false && isGated(entry)) || Boolean(options.probeGroups?.has(group.toLowerCase())));
+        let probeScopesHeld: boolean | undefined;
         if (wantProbe) {
-          const probeOp = pickProbeOperation(ops);
+          const pathValues = PROBE_PATH_VALUES[group] ?? {};
+          const probeOp = pickProbeOperation(ops, pathValues);
+          if (probeOp && scopesKnown) probeScopesHeld = scopesSatisfy(probeOp.scopeAlternatives, granted);
           if (!probeOp) {
-            report.probe = { skipped: "no parameter-free read endpoint in this group" };
+            report.probe = {
+              skipped: ops.some((op) => op.method === "get")
+                ? "every read endpoint needs an ID or object type this check does not know"
+                : "the group has no read endpoint, and writes are never used for testing",
+            };
           } else {
-            const probeArgs = probeOp.parameters.some((p) => p.in === "query" && p.name === "limit") ? { limit: 1 } : {};
+            const probeArgs: Record<string, unknown> = {};
+            for (const p of probeOp.parameters) {
+              if (p.in === "path" && p.name in pathValues) probeArgs[p.argName ?? p.name] = pathValues[p.name];
+              if (p.in === "query" && p.name === "limit") probeArgs[p.argName ?? p.name] = 1;
+            }
+            const endpoint = `GET ${probeOp.path.replace(/\{([^}]+)\}/g, (hit, name: string) => pathValues[name] ?? hit)}`;
             try {
               const res = await callProbe(cfg, probeOp, probeArgs);
-              report.probe = { status: res.status, ok: res.ok, endpoint: `GET ${probeOp.path}` };
+              const body = asRecord(res.body);
+              report.probe = {
+                status: res.status,
+                ok: res.ok,
+                endpoint,
+                ...(!res.ok && typeof body.category === "string" ? { category: body.category } : {}),
+                ...(!res.ok && typeof body.message === "string" ? { message: body.message } : {}),
+              };
             } catch (err) {
               report.probe = { skipped: `probe failed: ${err instanceof Error ? err.message : String(err)}` };
             }
           }
         }
 
-        Object.assign(report, decideAccess(report, isGated(entry), scopesKnown, unlocked, ops.length));
+        Object.assign(
+          report,
+          decideAccess(report, {
+            gated: isGated(entry),
+            scopesKnown,
+            granted,
+            tokenUsable: !tokenInfo.error,
+            probeScopesHeld,
+            unlocked,
+            total: ops.length,
+          }),
+        );
         return report;
       }),
   );
@@ -332,7 +439,7 @@ export async function checkCapabilities(
     ...(usage !== undefined ? { dailyApiUsage: usage } : {}),
     toolGroups: groups,
     notes: [
-      "access: available = scopes granted and, for paid-tier or beta groups, a live read succeeded; missing_scopes = the token lacks every scope the group needs; blocked = a live read returned 403 (plan tier or user permission) or 404 for a beta; unverified = could not be confirmed.",
+      "access: available = scopes granted and, for paid-tier or beta groups, a live read succeeded (a read does not prove writes are allowed); missing_scopes = the token lacks every scope the group needs, or a live read named scopes the token lacks; blocked = a live read returned 403 (plan tier or user permission, including MISSING_SCOPES although the token holds the listed scopes), 401 (the API does not accept this kind of token) or 404 for a beta; unverified = could not be confirmed.",
       "unlockedByScopes counts endpoints whose required scopes this token holds; it does not check plan tier.",
       "plan is HubSpot's published minimum tier per hub for the API. HubSpot has no API that returns the portal's subscription, so tiers are verified by probing.",
       `Hub keys: ${hubRequirementKeys.map((k) => `${k}=${HUB_NAMES[k]}`).join(", ")}.`,
@@ -362,9 +469,15 @@ export function summarizeProfile(profile: CapabilityProfile): string {
   const missing = groupsWith("missing_scopes");
   if (missing.length > 0) parts.push(`Missing scopes: ${listUpTo(missing, 25)}.`);
   const blocked = groupsWith("blocked");
-  if (blocked.length > 0) parts.push(`Blocked by plan tier or permissions: ${listUpTo(blocked, 25)}.`);
+  if (blocked.length > 0) parts.push(`Blocked by plan tier, permissions or token type: ${listUpTo(blocked, 25)}.`);
   const unverified = groupsWith("unverified");
   if (unverified.length > 0) parts.push(`Not verified: ${listUpTo(unverified, 25)}.`);
+  const readOnlyProof = profile.toolGroups
+    .filter((g) => g.access === "available" && g.probe && "ok" in g.probe && g.probe.ok && g.plan && PAID_TIER.test(g.plan))
+    .map((g) => g.group);
+  if (readOnlyProof.length > 0) {
+    parts.push(`Paid-tier groups confirmed only by a read can still refuse writes: ${listUpTo(readOnlyProof, 10)}.`);
+  }
   parts.push(`Prefer tools in usable groups; ${CAPABILITIES_TOOL_NAME} gives the reason and the scopes to add for each group.`);
   return parts.join(" ");
 }

@@ -338,7 +338,7 @@ async function runHttp(registry: Registry, config: ServerConfig, access: AccessS
   };
 
   // Sessions were previously only removed when the transport closed, and each
-  // one holds a full Server built over ~1,000 endpoint tools. A client that
+  // one holds a full Server built over the whole endpoint catalog. A client that
   // reconnects instead of closing grew the map until the process died.
   const sweep = setInterval(() => {
     const cutoff = Date.now() - cfg.sessionTtlMs;
