@@ -39,9 +39,9 @@ afterEach(() => {
 });
 
 describe("loadConfig", () => {
-  it("fails fast without an access token", () => {
+  it("starts without an access token, so the catalog can be listed", () => {
     delete process.env.HUBSPOT_ACCESS_TOKEN;
-    expect(() => loadConfig()).toThrow(/HUBSPOT_ACCESS_TOKEN/);
+    expect(loadConfig().accessToken).toBe("");
   });
 
   it("applies HubSpot-tuned defaults", () => {

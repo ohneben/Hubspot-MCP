@@ -99,6 +99,32 @@ function buildRegistry(config: ServerConfig): Registry {
   return { endpointTools, exposedTools, operations };
 }
 
+const MISSING_TOKEN_MESSAGE =
+  "HUBSPOT_ACCESS_TOKEN is not set, so this server cannot call HubSpot. Create a service key (or legacy private app token) " +
+  "in HubSpot under Settings -> Integrations, set it as HUBSPOT_ACCESS_TOKEN in the server environment, and restart the server.";
+
+/**
+ * Guidance the client places ahead of the tool catalog. It covers what no
+ * single tool description can: where to start, how the safety banners map to
+ * confirmation, and how plan/scope gating shows up.
+ */
+function serverInstructions(config: ServerConfig): string {
+  const lines = [
+    "HubSpot API server: tools map 1:1 to HubSpot's public REST endpoints (CRM, CMS, Marketing, Automation, Commerce, Files, Settings, Webhooks).",
+    "Every tool description starts with a safety banner that matches its annotations: 🟢 READ-ONLY (no changes), 🟡 WRITE (creates, updates, links or sends), 🔴 DESTRUCTIVE (deletes, merges, purges). Confirm 🔴 tools and 'sends messages' tools with the user before calling them.",
+    `Call ${CAPABILITIES_TOOL_NAME} first: it reports the portal, the token's granted scopes, daily API usage, and which tool groups this token unlocks. Access depends on the portal's hubs and plan tier and on the token's scopes; a 403 names the missing scope or the required tier.`,
+    "Prefer *_search and *_batch_* tools over loops of single calls. CRM list tools page with limit plus the after cursor; request only the properties you need.",
+    "CRM deletes archive records to the recycle bin for about 90 days. Merges and gdpr_delete purges are permanent.",
+  ];
+  if (config.toolMode === "discovery") {
+    lines.push(
+      `Discovery mode: find an endpoint with ${SEARCH_ENDPOINTS_TOOL}, read its input schema with ${GET_ENDPOINT_TOOL}, then call it with ${INVOKE_ENDPOINT_TOOL}.`,
+    );
+  }
+  if (config.readOnly) lines.push("Read-only mode: only 🟢 tools are exposed; no call can change the account.");
+  return lines.join("\n\n");
+}
+
 /** Stringify a response body and, if configured, truncate very large payloads. */
 function formatBody(config: ServerConfig, summary: string, body: unknown, rawBody?: string, hint?: string): string {
   let formatted = typeof body === "string" ? body : JSON.stringify(body, null, 2);
@@ -117,7 +143,10 @@ function formatBody(config: ServerConfig, summary: string, body: unknown, rawBod
 function buildServer(registry: Registry, config: ServerConfig): Server {
   const exposedMap = new Map(registry.exposedTools.map((t) => [t.name, t]));
   const endpointMap = new Map(registry.endpointTools.map((t) => [t.name, t]));
-  const server = new Server({ name: SERVER_NAME, version: SERVER_VERSION }, { capabilities: { tools: {} } });
+  const server = new Server(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    { capabilities: { tools: {} }, instructions: serverInstructions(config) },
+  );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: registry.exposedTools.map((t) => ({
@@ -141,6 +170,12 @@ function buildServer(registry: Registry, config: ServerConfig): Server {
     const { name, arguments: args } = request.params;
 
     try {
+      // Catalog lookups work offline; everything else calls HubSpot.
+      const offline = config.toolMode === "discovery" && (name === SEARCH_ENDPOINTS_TOOL || name === GET_ENDPOINT_TOOL);
+      if (!config.accessToken && !offline) {
+        return { isError: true, content: [{ type: "text", text: MISSING_TOKEN_MESSAGE }] };
+      }
+
       if (name === CAPABILITIES_TOOL_NAME && exposedMap.has(name)) {
         const text = await runCapabilities(config, registry.operations, args ?? {}, (cfg, op, probeArgs) =>
           callOperation(cfg, op, probeArgs),
@@ -487,6 +522,11 @@ async function runHttp(registry: Registry, config: ServerConfig) {
 async function main() {
   const config = loadConfig();
   const registry = buildRegistry(config);
+  // Start anyway: tools/list needs no credentials, so registries and inspectors
+  // can enumerate the catalog. Tool calls return MISSING_TOKEN_MESSAGE instead.
+  if (!config.accessToken) {
+    console.error(`${SERVER_NAME}: WARNING - HUBSPOT_ACCESS_TOKEN is not set. Tools are listed, but every HubSpot call will fail until it is.`);
+  }
 
   const transport = (process.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
   if (transport === "http" || transport === "streamable-http") {

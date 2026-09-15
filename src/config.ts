@@ -25,7 +25,7 @@ export type ToolMode = "all" | "discovery";
 export interface ServerConfig {
   /** Scheme + host of the HubSpot API (default https://api.hubapi.com). */
   baseUrl: string;
-  /** Private-app access token (`pat-…`) or OAuth access token. */
+  /** Service key / private-app token (`pat-…`) or OAuth access token; "" when unset. */
   accessToken: string;
   specDir: string;
 
@@ -60,16 +60,10 @@ export interface ServerConfig {
   fetchImpl?: typeof fetch;
 }
 
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v || v.trim().length === 0) {
-    throw new Error(
-      `Missing required environment variable: ${name}. ` +
-        `Required: HUBSPOT_ACCESS_TOKEN (a private-app token from ` +
-        `Settings → Integrations → Private Apps, or an OAuth access token). See README.md for setup.`,
-    );
-  }
-  return v.trim();
+/** The token is not needed to start: tools/list works without it, and tool
+ * calls report the missing token instead. Empty string when unset. */
+function tokenEnv(name: string): string {
+  return process.env[name]?.trim() ?? "";
 }
 
 /** Read a non-negative integer env var, falling back when unset/invalid. */
@@ -138,7 +132,7 @@ export function loadConfig(): ServerConfig {
 
   return {
     baseUrl,
-    accessToken: requireEnv("HUBSPOT_ACCESS_TOKEN"),
+    accessToken: tokenEnv("HUBSPOT_ACCESS_TOKEN"),
     specDir: resolveSpecDir(),
     maxRetries: intEnv("HUBSPOT_MAX_RETRIES", DEFAULT_MAX_RETRIES),
     timeoutMs: intEnv("HUBSPOT_TIMEOUT_MS", DEFAULT_TIMEOUT_MS),
