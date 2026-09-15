@@ -15,10 +15,18 @@ import { callOperation } from "./client.js";
 import { loadConfig, type ServerConfig } from "./config.js";
 import { loadAllSpecs, type Operation } from "./openapi.js";
 import { loadCatalog } from "./specs.js";
-import { operationsToTools, type ToolDefinition } from "./tools.js";
+import { operationsToTools, resolveCall, toolOperations, type ToolDefinition } from "./tools.js";
 import { GRAPHQL_TOOL_NAME, callGraphql, graphqlTool } from "./graphql.js";
 import { RAW_REQUEST_TOOL_NAME, callRawRequest, rawRequestTool } from "./rawRequest.js";
-import { CAPABILITIES_TOOL_NAME, capabilitiesTool, runCapabilities } from "./capabilities.js";
+import {
+  CAPABILITIES_TOOL_NAME,
+  capabilitiesTool,
+  checkCapabilities,
+  runCapabilities,
+  summarizeProfile,
+  type CapabilityProfile,
+  type ProbeFn,
+} from "./capabilities.js";
 import {
   GET_ENDPOINT_TOOL,
   INVOKE_ENDPOINT_TOOL,
@@ -62,6 +70,18 @@ function readPackageVersion(): string {
 
 const SERVER_VERSION = readPackageVersion();
 
+/** How long stdio startup waits for the access check before serving without it. */
+const ACCESS_CHECK_WAIT_MS = 10_000;
+
+/** The startup access check's result, shared by every session once it lands. */
+interface AccessState {
+  profile?: CapabilityProfile;
+}
+
+/** Probes fail fast: a slow or failing probe only means "unverified". */
+const probeOperation: ProbeFn = (cfg, op, args) =>
+  callOperation({ ...cfg, maxRetries: 0, timeoutMs: Math.min(cfg.timeoutMs, 10_000) }, op, args);
+
 interface Registry {
   /** Endpoint tools generated from the specs (post-filtering). */
   endpointTools: ToolDefinition[];
@@ -81,9 +101,7 @@ function buildRegistry(config: ServerConfig): Registry {
     readOnly: config.readOnly,
     includeBeta: config.includeBeta,
   });
-  const operations = endpointTools
-    .map((t) => t.operation)
-    .filter((op): op is Operation => op !== null);
+  const operations = endpointTools.flatMap(toolOperations);
 
   const special: ToolDefinition[] = [capabilitiesTool()];
   // HubSpot's GraphQL endpoint is query-only, so it stays in read-only mode.
@@ -108,11 +126,13 @@ const MISSING_TOKEN_MESSAGE =
  * single tool description can: where to start, how the safety banners map to
  * confirmation, and how plan/scope gating shows up.
  */
-function serverInstructions(config: ServerConfig): string {
+function serverInstructions(config: ServerConfig, access: AccessState): string {
   const lines = [
     "HubSpot API server: tools map 1:1 to HubSpot's public REST endpoints (CRM, CMS, Marketing, Automation, Commerce, Files, Settings, Webhooks).",
     "Every tool description starts with a safety banner that matches its annotations: 🟢 READ-ONLY (no changes), 🟡 WRITE (creates, updates, links or sends), 🔴 DESTRUCTIVE (deletes, merges, purges). Confirm 🔴 tools and 'sends messages' tools with the user before calling them.",
-    `Call ${CAPABILITIES_TOOL_NAME} first: it reports the portal, the token's granted scopes, daily API usage, and which tool groups this token unlocks. Access depends on the portal's hubs and plan tier and on the token's scopes; a 403 names the missing scope or the required tier.`,
+    access.profile
+      ? `The server checked this token's access when it started. ${summarizeProfile(access.profile)}`
+      : `Call ${CAPABILITIES_TOOL_NAME} first: it reports the portal, the token's granted scopes, daily API usage, and an access status for every API group. Access depends on the portal's hubs and plan tier and on the token's scopes; a 403 names the missing scope or the required tier.`,
     "Prefer *_search and *_batch_* tools over loops of single calls. CRM list tools page with limit plus the after cursor; request only the properties you need.",
     "CRM deletes archive records to the recycle bin for about 90 days. Merges and gdpr_delete purges are permanent.",
   ];
@@ -140,12 +160,12 @@ function formatBody(config: ServerConfig, summary: string, body: unknown, rawBod
   return `${summary}\n${formatted}${hintBlock}`;
 }
 
-function buildServer(registry: Registry, config: ServerConfig): Server {
+function buildServer(registry: Registry, config: ServerConfig, access: AccessState): Server {
   const exposedMap = new Map(registry.exposedTools.map((t) => [t.name, t]));
   const endpointMap = new Map(registry.endpointTools.map((t) => [t.name, t]));
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {} }, instructions: serverInstructions(config) },
+    { capabilities: { tools: {} }, instructions: serverInstructions(config, access) },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -158,7 +178,8 @@ function buildServer(registry: Registry, config: ServerConfig): Server {
   }));
 
   const runEndpointTool = async (tool: ToolDefinition, args: unknown) => {
-    const result = await callOperation(config, tool.operation!, args ?? {});
+    const call = resolveCall(tool, args ?? {});
+    const result = await callOperation(config, call.operation, call.args);
     const summary = `HTTP ${result.status} ${result.ok ? "OK" : "ERROR"}`;
     return {
       isError: !result.ok,
@@ -177,9 +198,7 @@ function buildServer(registry: Registry, config: ServerConfig): Server {
       }
 
       if (name === CAPABILITIES_TOOL_NAME && exposedMap.has(name)) {
-        const text = await runCapabilities(config, registry.operations, args ?? {}, (cfg, op, probeArgs) =>
-          callOperation(cfg, op, probeArgs),
-        );
+        const text = await runCapabilities(config, registry.operations, args ?? {}, probeOperation, access);
         return { content: [{ type: "text", text }] };
       }
 
@@ -197,10 +216,10 @@ function buildServer(registry: Registry, config: ServerConfig): Server {
 
       if (config.toolMode === "discovery") {
         if (name === SEARCH_ENDPOINTS_TOOL) {
-          return { content: [{ type: "text", text: handleSearchEndpoints(registry.endpointTools, args ?? {}) }] };
+          return { content: [{ type: "text", text: handleSearchEndpoints(registry.endpointTools, args ?? {}, access.profile) }] };
         }
         if (name === GET_ENDPOINT_TOOL) {
-          return { content: [{ type: "text", text: handleGetEndpoint(endpointMap, args ?? {}) }] };
+          return { content: [{ type: "text", text: handleGetEndpoint(endpointMap, args ?? {}, access.profile) }] };
         }
         if (name === INVOKE_ENDPOINT_TOOL) {
           const a = (args ?? {}) as Record<string, unknown>;
@@ -264,14 +283,14 @@ async function readBody(
   }
 }
 
-async function runStdio(registry: Registry, config: ServerConfig) {
-  const server = buildServer(registry, config);
+async function runStdio(registry: Registry, config: ServerConfig, access: AccessState) {
+  const server = buildServer(registry, config, access);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`${SERVER_NAME} (stdio) ready: ${registry.exposedTools.length} tools registered.`);
 }
 
-async function runHttp(registry: Registry, config: ServerConfig) {
+async function runHttp(registry: Registry, config: ServerConfig, access: AccessState) {
   const cfg = loadHttpConfig();
 
   // A server reachable beyond this machine must require a token. This endpoint
@@ -442,7 +461,7 @@ async function runHttp(registry: Registry, config: ServerConfig) {
         session.lastSeen = Date.now();
       } else if (req.method === "POST" && isInitializeRequest(body)) {
         if (sessions.size >= cfg.maxSessions) evictOldest();
-        const server = buildServer(registry, config);
+        const server = buildServer(registry, config, access);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newId) => {
@@ -519,6 +538,26 @@ async function runHttp(registry: Registry, config: ServerConfig) {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
+/**
+ * Check scopes and probe paid-tier or beta groups once, in the background.
+ * Skipped without a token or with HUBSPOT_CAPABILITY_CHECK=false.
+ */
+function startAccessCheck(config: ServerConfig, registry: Registry, access: AccessState): Promise<void> | undefined {
+  if (!config.accessToken || !config.capabilityCheck) return undefined;
+  const started = Date.now();
+  return checkCapabilities(config, registry.operations, probeOperation)
+    .then((profile) => {
+      access.profile = profile;
+      const usable = profile.toolGroups.filter((g) => g.access === "available").length;
+      console.error(
+        `${SERVER_NAME}: access check done in ${Date.now() - started} ms: ${usable} of ${profile.toolGroups.length} API groups usable.`,
+      );
+    })
+    .catch((err) => {
+      console.error(`${SERVER_NAME}: access check failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+}
+
 async function main() {
   const config = loadConfig();
   const registry = buildRegistry(config);
@@ -528,11 +567,17 @@ async function main() {
     console.error(`${SERVER_NAME}: WARNING - HUBSPOT_ACCESS_TOKEN is not set. Tools are listed, but every HubSpot call will fail until it is.`);
   }
 
+  const access: AccessState = {};
+  const check = startAccessCheck(config, registry, access);
+
   const transport = (process.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
   if (transport === "http" || transport === "streamable-http") {
-    await runHttp(registry, config);
+    // Listen right away so health checks pass; sessions opened after the check get its result.
+    await runHttp(registry, config, access);
   } else if (transport === "stdio") {
-    await runStdio(registry, config);
+    // The initialize reply carries the instructions, so give the check a moment to land first.
+    if (check) await Promise.race([check, new Promise((done) => setTimeout(done, ACCESS_CHECK_WAIT_MS).unref())]);
+    await runStdio(registry, config, access);
   } else {
     throw new Error(`Unknown MCP_TRANSPORT: ${transport}. Use "stdio" or "http".`);
   }

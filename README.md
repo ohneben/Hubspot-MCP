@@ -20,9 +20,12 @@
 **Cursor**, or any other [MCP](https://modelcontextprotocol.io) client.
 
 This [Model Context Protocol](https://modelcontextprotocol.io) server exposes the
-**whole public HubSpot API — 1,076 endpoint tools across 102 APIs** — CRM, CMS,
-Marketing, Automation, Conversations, Commerce, Files, Settings, Webhooks and
-more, generated straight from HubSpot's own OpenAPI definitions. Every tool is
+**whole public HubSpot API — all 1,076 endpoints across 102 APIs, in 687
+tools** — CRM, CMS, Marketing, Automation, Conversations, Commerce, Files,
+Settings, Webhooks and more, generated straight from HubSpot's own OpenAPI
+definitions. Endpoints HubSpot repeats per object type are one tool each
+(`crm_objects_search` with `objectType: "deals"` instead of 32 separate search
+tools), and every tool description says when to use it. Every tool is
 **safety-categorized** (🟢 read-only / 🟡 write / 🔴 destructive) and — unique to
 this server — **hub & plan aware**: HubSpot publishes which hub and tier every
 API needs (Free / Starter / Professional / Enterprise), and this server carries
@@ -39,14 +42,16 @@ to hand to an LLM**, **complete**, and **easy to run for real**:
 
 | What you get | Why it matters |
 | --- | --- |
-| **1,076 tools — the whole public API** | Contacts, companies, deals, tickets, every engagement type, associations v4, properties, pipelines, lists, imports/exports, marketing emails & events, campaigns, forms, transactional email, sequences, workflows/actions, conversations & custom channels, CMS pages/posts/HubDB/source code, files, commerce (invoices, orders, carts, payments, subscriptions), settings, webhooks — nothing hand-picked or left behind. Most servers stop at ~30 CRM tools. |
+| **All 1,076 endpoints — the whole public API** | Contacts, companies, deals, tickets, every engagement type, associations v4, properties, pipelines, lists, imports/exports, marketing emails & events, campaigns, forms, transactional email, sequences, workflows/actions, conversations & custom channels, CMS pages/posts/HubDB/source code, files, commerce (invoices, orders, carts, payments, subscriptions), settings, webhooks — nothing hand-picked or left behind. Most servers stop at ~30 CRM tools. |
+| **687 tools, not 1,076 look-alikes** | HubSpot repeats the same endpoints for 32 CRM object types, for landing and site pages, and for blog posts, authors and tags. Those are one tool each with a selector argument (`objectType`, `pageType`, `blogResource`), so `crm_objects_search` covers contacts, deals, tickets and custom objects. Every call still goes to exactly the endpoint it went to before, with that endpoint's scopes and plan hints. |
+| **Descriptions that say when to use a tool** | Each description opens with what the tool does, then when to prefer a sibling (`crm_objects_list` points to `crm_objects_search` for filtering and `crm_objects_batch_read` for known IDs), what it changes, plan and scopes, and the endpoint it calls. Undocumented HubSpot parameters get a description. |
 | **Hub & plan awareness** *(nobody else has this)* | HubSpot gates APIs by hub and tier — HubDB needs Content/Marketing Hub **Professional**, custom-object schemas need **Enterprise**, sequences need Sales/Service **Professional**. Every tool states its requirement, straight from HubSpot's own API index. |
-| **`hubspot_get_capabilities`** | One call reports your portal, your token's granted scopes, today's API usage vs. the daily cap, and — per tool group — how many endpoints your token actually unlocks, with the scopes needed to unlock the rest. Optional live probes verify access end-to-end. No more walls of mystery 403s. |
+| **Access check at startup** | When the server starts it reads the token's scopes and probes every paid-tier or beta API group with one cheap read. The model gets the result in the server instructions, search results say per tool whether this token can use it, and `hubspot_get_capabilities` explains each status with the scopes to add. No more walls of mystery 403s. |
 | **Curated safety categories** 🟢 / 🟡 / 🔴 | Not naive "GET = safe": a `POST …/search` is a **read-only query**, `merge` is flagged **irreversible**, `gdpr-delete` is a **permanent purge** (vs. archive → recycle bin), list-membership calls are reversible **links**, `POST /crm/v3/imports` is a **bulk import**, and transactional email is **sends messages**. |
 | **Machine-readable MCP annotations** (`readOnlyHint`, `destructiveHint`) | Hosts that honor annotations (Claude included) can auto-trust reads and demand confirmation before anything destructive. |
 | **Actionable error hints** | 403 with `MISSING_SCOPES` → the exact scopes to add and where; plain 403 on a gated API → the plan tier it needs; 401 → token type & expiry guidance; 429 → your limits. The model gets *how to fix it*, not just *what broke*. |
-| **Read-only mode & group filtering** | Expose only the 443 🟢 read-only tools (`HUBSPOT_READ_ONLY=true`), or narrow to the groups you use (`HUBSPOT_INCLUDE_GROUPS=contacts,deals,cms:*`). Area wildcards included. |
-| **Discovery mode** | `HUBSPOT_TOOL_MODE=discovery` swaps the 1,000+ tool list for 3 meta-tools (search / inspect / invoke over the same registry) — same coverage, tiny context footprint, and read-only mode still applies. |
+| **Read-only mode & group filtering** | Expose only the 302 🟢 read-only tools (`HUBSPOT_READ_ONLY=true`), or narrow to the groups you use (`HUBSPOT_INCLUDE_GROUPS=contacts,deals,cms:*`). Area wildcards included. |
+| **Discovery mode by default** | Out of the box the model sees 6 tools (~2k tokens): search, inspect and invoke over all 687 endpoint tools, plus the capability, GraphQL and raw-request tools. `HUBSPOT_TOOL_MODE=all` exposes every endpoint tool directly. Read-only mode applies either way. |
 | **Real file uploads** | The multipart endpoints (Files, CRM imports, HubDB import, CMS source code) actually work — pass file content inline or as base64. Most generated servers can't do multipart at all. |
 | **Automatic retries with backoff** | Transient `429` / `5xx` responses are retried with jittered exponential backoff, honoring HubSpot's `Retry-After` header. |
 | **Built-in rate limiting** | Self-throttles under HubSpot's burst caps (default 100 req / 10 s) with a **separate limiter for the `/search` endpoints** (~5 req/s cap). A burst of tool calls won't trip a `429`. |
@@ -66,7 +71,7 @@ server stacks up against the alternatives:
 
 | | **This server** | Official HubSpot MCP | shinzo-labs `hubspot-mcp` | `mcp-hubspot` (buryhuang) | CData MCP |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Approx. tools | **~1,079** | ~7 curated (remote) | 100+ | ~7 | 3 (generic SQL) |
+| Approx. tools | **~690 (all 1,076 endpoints)** | ~7 curated (remote) | 100+ | ~7 | 3 (generic SQL) |
 | Whole public API (CRM **and** CMS · Marketing · Automation · Commerce · Files · Settings · Webhooks) | ✅ | ➖ CRM + some content reads | ➖ CRM-centric | ❌ | ❌ |
 | Hub & plan-tier awareness per tool | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Account capability report (scopes · usage · unlocks) | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -121,8 +126,9 @@ Claude / Cursor / any MCP client  ──MCP──►  this server  ──HTTPS�
 
 The server parses 104 bundled OpenAPI definitions (fetched from HubSpot's public
 API index, which also publishes per-API **hub/tier requirements**) into MCP
-tools — resolving `$ref`s, guarding against recursive schemas, deriving clean
-names like `contacts_search` and `hubdb_tables_create_table`, and tagging each
+tools — resolving `$ref`s, guarding against recursive schemas, merging
+endpoints that only differ by object type into one tool, deriving clean names
+like `crm_objects_search` and `hubdb_tables_create_table`, and tagging each
 tool with a curated safety category, its plan requirement and its OAuth scopes.
 Your access token is injected server-side on every request; the model never
 sees or handles it.
@@ -137,17 +143,27 @@ to your token. This server is built around that reality:
 1. **Every tool description carries the requirement**, from HubSpot's own index:
 
    ```
-   🟢 READ-ONLY · Hubdb (CMS) · GET /cms/v3/hubdb/tables
+   🟢 READ-ONLY · Get all published tables.
+   Use to page through tables: pass limit, then the after cursor from paging.next.after for the next page.
    …
    Plan: Professional tier of Marketing Hub / Content Hub. Scopes: hubdb.
+   Endpoint: GET /cms/v3/hubdb/tables (Hubdb API, CMS)
    ```
 
-2. **`hubspot_get_capabilities`** reports, for *your* portal and token: account
-   details, granted scopes, today's API usage vs. the daily cap, and per tool
-   group how many endpoints are unlocked (`"unlockedByScopes": "13/16"`), what
-   would unlock the rest, plan requirements and beta status. Pass
-   `probe_groups: ["hubdb"]` to live-verify with one cheap read per group —
-   plan gates often only surface as 403s, and this catches them up front.
+   Consolidated tools state it per value: `crm_objects_list` lists which
+   object types need a paid tier in its `objectType` parameter.
+
+2. **An access check runs when the server starts.** HubSpot has no API that
+   returns a portal's subscription, so the server combines what it can
+   observe: the token's granted scopes, and one cheap read per paid-tier or
+   beta group (up to about 30 API calls; plan gates only surface as 403s).
+   Every group gets a status: `available`, `missing_scopes`, `blocked` (plan
+   tier or user permission) or `unverified`. The model receives a summary in
+   the server instructions, `hubspot_search_endpoints` marks each result (and
+   takes `usable_only: true`), and `hubspot_get_capabilities` returns the full
+   report with reasons, `"unlockedByScopes": "13/16"` counts and the scopes to
+   add; `refresh: true` runs it again. Turn it off with
+   `HUBSPOT_CAPABILITY_CHECK=false`.
 
 3. **403s come back with the fix**: missing scope → the exact scope name and
    where to grant it; plan-gated API → the tier HubSpot requires.
@@ -183,7 +199,7 @@ reachable from your machine but not the network.
 
 ```bash
 curl -s http://localhost:8765/health
-# → {"status":"ok","server":"hubspot-mcp","tools":1079,"endpoints":1076,"mode":"all"}
+# → {"status":"ok","server":"hubspot-mcp"}
 ```
 
 **4. Connect your MCP client.** The MCP endpoint is `http://localhost:8765/mcp`.
@@ -220,11 +236,12 @@ curl -s http://localhost:8765/health
 - **Claude Cowork** — shares Claude Code's MCP config, so the command above makes
   the tools available there too.
 
-> **Tip:** 1,000+ tools is a lot for some clients. Trim the surface with
-> `HUBSPOT_INCLUDE_GROUPS` (e.g. `contacts,companies,deals,tickets,lists`), or
-> set `HUBSPOT_TOOL_MODE=discovery` to get the same coverage through 3
-> meta-tools — see [Context footprint](#context-footprint) for measured
-> numbers per configuration.
+> **Tip:** by default the model sees 6 tools and reaches every endpoint through
+> search → inspect → invoke. For one tool per endpoint set
+> `HUBSPOT_TOOL_MODE=all` (690 tools) and trim it with `HUBSPOT_INCLUDE_GROUPS`
+> (e.g. `contacts,companies,deals,tickets,lists`) — see
+> [Context footprint](#context-footprint) for measured numbers per
+> configuration.
 
 ### Prefer a prebuilt image?
 
@@ -297,7 +314,8 @@ Everything is set in `.env` (copied from `.env.example`):
 | `HUBSPOT_INCLUDE_GROUPS` | — | _(all)_ | Only expose these groups — keys like `contacts,deals` and area wildcards like `cms:*` |
 | `HUBSPOT_EXCLUDE_GROUPS` | — | _(none)_ | Hide these groups (same syntax) |
 | `HUBSPOT_INCLUDE_BETA` | — | `true` | Include beta / developer-preview APIs |
-| `HUBSPOT_TOOL_MODE` | — | `all` | `all` (one tool per endpoint) or `discovery` (3 meta-tools) |
+| `HUBSPOT_TOOL_MODE` | — | `discovery` | `discovery` (3 meta-tools over the whole catalog) or `all` (one tool per endpoint or endpoint family) |
+| `HUBSPOT_CAPABILITY_CHECK` | — | `true` | Read the token's scopes and probe paid-tier or beta groups at startup (up to about 30 API calls) |
 | `HUBSPOT_ENABLE_GRAPHQL` | — | `true` | Expose the CRM GraphQL query tool |
 | `HUBSPOT_GRAPHQL_URL` | — | _(derived)_ | Override the GraphQL endpoint |
 | `HUBSPOT_ENABLE_RAW_REQUEST` | — | `true` | Expose the raw-request escape hatch (auto-hidden in read-only mode) |
@@ -308,100 +326,107 @@ After changing `.env`, reload with `docker compose up -d --force-recreate`.
 
 Run `npm run list-tools` (no credentials needed) to print the full catalog, the
 per-category counts, and every group key you can filter on — add `--names` to
-list all 1,076 tool names.
+list all 687 tool names with the endpoint each one calls.
 
 ## Tool safety categories
 
 Each tool's description starts with one of these banners and carries the matching
 [MCP annotations](https://modelcontextprotocol.io/docs/concepts/tools#tool-annotations):
 
-| Banner | Count | `readOnlyHint` | `destructiveHint` | Meaning |
-|---|:---:|:---:|:---:|---|
-| 🟢 **READ-ONLY** | 348 | `true` | `false` | `GET` — fetches data only. Safe. |
-| 🟢 **READ-ONLY · query** | 95 | `true` | `false` | A `POST` that *searches/reads* (object search, batch read, export start, token introspection) — changes no records. |
-| 🟡 **WRITE · creates data** | 245 | `false` | `false` | Creates records (not idempotent; may duplicate). |
-| 🟡 **WRITE · creates or updates** | 36 | `false` | `false` | Idempotent upserts (batch upsert, marketing-event upsert). |
-| 🟡 **WRITE · updates data** | 168 | `false` | `false` | Modifies records/settings in place. |
-| 🟡 **WRITE · links records** | 19 | `false` | `false` | Associates records (list memberships, v4 associations). Reversible. |
-| 🟡 **WRITE · unlinks records** | 12 | `false` | `false` | Removes associations. Reversible — records survive. |
-| 🟡 **WRITE · sends messages** | 4 | `false` | `false` | Marketing/transactional email, sequence enrollment, conversation replies. |
-| 🟡 **WRITE · bulk import** | 1 | `false` | `false` | `POST /crm/v3/imports` — can create/update thousands of records. |
-| 🔴 **DESTRUCTIVE · deletes data** | 96 | `false` | `true` | Deletes/archives a record (CRM archives are restorable ~90 days). |
-| 🔴 **DESTRUCTIVE · bulk delete** | 42 | `false` | `true` | Batch archive — many records in one call. |
-| 🔴 **DESTRUCTIVE · merges records** | 7 | `false` | `true` | HubSpot **cannot un-merge**. Confirm both IDs first. |
-| 🔴 **DESTRUCTIVE · permanent GDPR purge** | 3 | `false` | `true` | Skips the recycle bin; gone forever. |
+| Banner | Tools | Endpoints | `readOnlyHint` | `destructiveHint` | Meaning |
+|---|:---:|:---:|:---:|:---:|---|
+| 🟢 **READ-ONLY** | 274 | 348 | `true` | `false` | `GET` — fetches data only. Safe. |
+| 🟢 **READ-ONLY · query** | 28 | 95 | `true` | `false` | A `POST` that *searches/reads* (object search, batch read, export start, token introspection) — changes no records. |
+| 🟡 **WRITE · creates data** | 133 | 198 | `false` | `false` | Creates records (not idempotent; may duplicate). |
+| 🟡 **WRITE · creates or updates** | 7 | 36 | `false` | `false` | Idempotent upserts (batch upsert, marketing-event upsert). |
+| 🟡 **WRITE · updates data** | 131 | 215 | `false` | `false` | Modifies records/settings in place, including publishing, scheduling and restoring existing content. |
+| 🟡 **WRITE · links records** | 18 | 19 | `false` | `false` | Associates records (list memberships, v4 associations). Reversible. |
+| 🟡 **WRITE · unlinks records** | 11 | 12 | `false` | `false` | Removes associations. Reversible — records survive. |
+| 🟡 **WRITE · sends messages** | 4 | 4 | `false` | `false` | Marketing/transactional email, sequence enrollment, conversation replies. |
+| 🟡 **WRITE · bulk import** | 1 | 1 | `false` | `false` | `POST /crm/v3/imports` — can create/update thousands of records. |
+| 🔴 **DESTRUCTIVE · deletes data** | 64 | 96 | `false` | `true` | Deletes/archives a record (CRM archives are restorable ~90 days). |
+| 🔴 **DESTRUCTIVE · bulk delete** | 10 | 42 | `false` | `true` | Batch archive — many records in one call. |
+| 🔴 **DESTRUCTIVE · merges records** | 3 | 7 | `false` | `true` | HubSpot **cannot un-merge**. Confirm both IDs first. |
+| 🔴 **DESTRUCTIVE · permanent GDPR purge** | 3 | 3 | `false` | `true` | Skips the recycle bin; gone forever. |
 
-That's **443 read-only · 485 write · 148 destructive = 1,076 endpoint tools**,
-plus the three power tools below. Hosts that respect annotations (Claude
-included) can require confirmation for `destructiveHint` tools and trust
-`readOnlyHint` tools automatically. Prefer to lock it down further? Set
-`HUBSPOT_READ_ONLY=true` to expose *only* the 443 read-only tools (plus the 🟢
-capability and GraphQL tools).
+That's **302 read-only · 305 write · 80 destructive = 687 endpoint tools**
+(443 · 485 · 148 = 1,076 endpoints), plus the three power tools below. Hosts
+that respect annotations (Claude included) can require confirmation for
+`destructiveHint` tools and trust `readOnlyHint` tools automatically. Prefer to
+lock it down further? Set `HUBSPOT_READ_ONLY=true` to expose *only* the 302
+read-only tools (plus the 🟢 capability and GraphQL tools).
 
 <details>
-<summary><strong>Coverage by area (APIs / 🟢 read / 🟡 write / 🔴 destructive)</strong></summary>
+<summary><strong>Coverage by area (APIs / endpoints by 🟢 read / 🟡 write / 🔴 destructive / tools)</strong></summary>
 
-| Area | APIs | 🟢 Read | 🟡 Write | 🔴 Delete | Tools |
-|---|:---:|:---:|:---:|:---:|:---:|
-| CRM | 58 | 216 | 245 | 92 | **553** |
-| CMS | 13 | 74 | 123 | 22 | **219** |
-| Marketing | 7 | 42 | 46 | 11 | **99** |
-| Conversations | 3 | 18 | 11 | 3 | **32** |
-| Automation | 3 | 17 | 10 | 4 | **31** |
-| Webhooks Journal | 1 | 20 | 3 | 3 | **26** |
-| Settings | 3 | 14 | 9 | 1 | **24** |
-| Files | 1 | 10 | 7 | 4 | **21** |
-| Communication Preferences | 1 | 6 | 8 | 0 | **14** |
-| Events | 3 | 4 | 7 | 2 | **13** |
-| Webhooks | 1 | 3 | 4 | 2 | **9** |
-| Data Studio | 1 | 1 | 6 | 1 | **8** |
-| Auth (OAuth) | 1 | 3 | 2 | 2 | **7** |
-| Account | 2 | 5 | 0 | 0 | **5** |
-| Commerce | 1 | 2 | 2 | 1 | **5** |
-| Scheduler | 1 | 3 | 2 | 0 | **5** |
-| Meta | 1 | 4 | 0 | 0 | **4** |
-| Business Units | 1 | 1 | 0 | 0 | **1** |
-| **Total** | **102** | **443** | **485** | **148** | **1,076** |
+| Area | APIs | 🟢 Read | 🟡 Write | 🔴 Delete | Endpoints | Tools |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| CRM | 58 | 216 | 245 | 92 | 553 | **211** |
+| CMS | 13 | 74 | 123 | 22 | 219 | **172** |
+| Marketing | 7 | 42 | 46 | 11 | 99 | **99** |
+| Conversations | 3 | 18 | 11 | 3 | 32 | **32** |
+| Automation | 3 | 17 | 10 | 4 | 31 | **31** |
+| Webhooks Journal | 1 | 20 | 3 | 3 | 26 | **26** |
+| Settings | 3 | 14 | 9 | 1 | 24 | **24** |
+| Files | 1 | 10 | 7 | 4 | 21 | **21** |
+| Communication Preferences | 1 | 6 | 8 | 0 | 14 | **14** |
+| Events | 3 | 4 | 7 | 2 | 13 | **13** |
+| Webhooks | 1 | 3 | 4 | 2 | 9 | **9** |
+| Data Studio | 1 | 1 | 6 | 1 | 8 | **8** |
+| Auth (OAuth) | 1 | 3 | 2 | 2 | 7 | **7** |
+| Account | 2 | 5 | 0 | 0 | 5 | **5** |
+| Commerce | 1 | 2 | 2 | 1 | 5 | **5** |
+| Scheduler | 1 | 3 | 2 | 0 | 5 | **5** |
+| Meta | 1 | 4 | 0 | 0 | 4 | **4** |
+| Business Units | 1 | 1 | 0 | 0 | 1 | **1** |
+| **Total** | **102** | **443** | **485** | **148** | **1,076** | **687** |
 
 </details>
 
 ## Context footprint
 
-What does 1,000+ tools cost in model context? Measured on the bundled specs
+What does the tool list cost in model context? Measured on the bundled specs
 (`tools/list` JSON payload; tokens ≈ chars ÷ 3.6):
 
 | Configuration | Tools | Payload | ≈ Tokens |
 |---|---:|---:|---:|
-| Full (default) | 1,079 | 2.20 MB | ~612k |
-| Read-only mode | 445 | 0.61 MB | ~169k |
-| CRM core preset¹ | 176 | 0.29 MB | ~81k |
-| CRM core preset¹ + read-only | 65 | 0.10 MB | ~28k |
-| **Discovery mode** | **6** | **0.01 MB** | **~2k** |
+| **Discovery mode (default)** | **6** | **0.01 MB** | **~2k** |
+| `HUBSPOT_TOOL_MODE=all` | 690 | 1.33 MB | ~370k |
+| `all` + read-only | 304 | 0.38 MB | ~104k |
+| `all` + CRM core preset¹ | 85 | 0.13 MB | ~36k |
+| `all` + CRM core preset¹ + read-only | 33 | 0.04 MB | ~12k |
+
+In discovery mode each `hubspot_get_endpoint` lookup adds only the schema the
+model asked for: about 350 tokens for a typical endpoint, up to ~12k for the
+largest CMS page bodies.
 
 <sub>¹ `HUBSPOT_INCLUDE_GROUPS=contacts,companies,deals,tickets,lists,properties,associations,pipelines,crm-owners,notes,tasks,calls,emails,meetings`</sub>
 
 How to read that:
 
+- **Discovery mode loses no coverage**: all 1,076 endpoints stay callable
+  through search → inspect → invoke, at the cost of one or two extra calls the
+  first time the model uses an endpoint.
 - **Clients with tool search / deferred loading** (Claude Code, claude.ai
-  connectors) don't pay the upfront cost — tool definitions load on demand,
-  so full mode is fine and only the tools actually used land in context.
-- **Clients that inject every tool definition upfront** should pick a lever:
-  `HUBSPOT_TOOL_MODE=discovery` (~2k tokens, **zero coverage lost** — all
-  1,076 endpoints stay callable through search → inspect → invoke), a
-  `HUBSPOT_INCLUDE_GROUPS` preset, and/or `HUBSPOT_READ_ONLY=true`.
+  connectors) load tool definitions on demand, so `HUBSPOT_TOOL_MODE=all` works
+  well there; narrow it with a `HUBSPOT_INCLUDE_GROUPS` preset and/or
+  `HUBSPOT_READ_ONLY=true`.
 - **Responses consume context too.** Cap outliers with
   `HUBSPOT_MAX_RESPONSE_CHARS` (e.g. `40000`) and request only the
   `properties` you need on CRM reads.
 - Oversized inline schemas are already handled: the four pathological
   recursive schemas (list filters, workflow definitions — ~1.7 MB *each*
   fully inlined) are budget-pruned to ≤24 KB with their top levels intact.
+  Input schemas also drop examples and any prose below the body's own fields;
+  every field, type, enum and required list stays.
 
 ## The power tools
 
 Besides the generated endpoint tools, the server ships four hand-built ones:
 
-- **`hubspot_get_capabilities`** 🟢 — the capability report described
-  [above](#hub--plan-awareness). Call it first in a session.
+- **`hubspot_get_capabilities`** 🟢 — the access report described
+  [above](#hub--plan-awareness). Returns the startup check without new API
+  calls; `refresh: true` runs it again.
 - **`hubspot_graphql_query`** 🟢 — HubSpot's CRM GraphQL API
   (`POST /collector/graphql`). Query-only by design (HubSpot exposes no
   mutations), so it stays available even in read-only mode. Requires the
@@ -409,12 +434,41 @@ Besides the generated endpoint tools, the server ships four hand-built ones:
 - **`hubspot_api_request`** 🔴 — raw escape hatch for any path on the HubSpot
   host (new betas, undocumented corners). Same auth injection, throttling and
   retries. Hidden in read-only mode.
-- **Discovery mode** (`HUBSPOT_TOOL_MODE=discovery`) — replaces the 1,076
-  per-endpoint tools with `hubspot_search_endpoints` →
+- **Discovery mode** (the default) — replaces the 687
+  endpoint tools with `hubspot_search_endpoints` →
   `hubspot_get_endpoint` → `hubspot_invoke_endpoint` over the same registry.
   All filters (groups, beta, read-only) still apply; in read-only mode the
   invoke tool physically cannot reach a write because writes aren't in the
   registry.
+
+## Upgrading from 1.x
+
+2.0 merges endpoints that HubSpot repeats per object type into one tool with a
+selector argument. Every endpoint is still reachable and sends the same
+request; only tool names and a few argument names change. Update saved
+prompts, client allowlists and permission rules that name tools. Group keys
+for `HUBSPOT_INCLUDE_GROUPS` / `HUBSPOT_EXCLUDE_GROUPS` (`contacts`, `deals`,
+`pages`, …) are unchanged.
+
+| 1.x tools | 2.0 tool | Arguments |
+|---|---|---|
+| `contacts_list`, `deals_list`, `tickets_list`, … `custom_objects_list` | `crm_objects_list` | `objectType: "contacts"` (or `"deals"`, `"0-3"`, a custom `"2-12345"`, …) |
+| `<type>_get`, `<type>_update`, `<type>_archive` (some were `<type>_delete`) | `crm_objects_get`, `crm_objects_update`, `crm_objects_archive` | `objectType`; the record ID is `objectId` instead of `contactId`, `dealId`, … |
+| `<type>_create`, `<type>_search`, `<type>_merge`, `<type>_batch_read` / `_create` / `_update` / `_upsert` / `_archive` | `crm_objects_create`, `crm_objects_search`, `crm_objects_merge`, `crm_objects_batch_*` | `objectType` |
+| `partner_clients_associations_*`, `partner_services_associations_*` | `crm_objects_associations_list` / `_create` / `_delete` | `objectType: "partner_clients"` or `"partner_services"`, `objectId` |
+| `pages_landing_*`, `pages_site_*` | `cms_pages_*`, e.g. `cms_pages_draft_push_live` | `pageType: "landing"` or `"site"` |
+| `posts_blogs_*`, `authors_blogs_*`, `tags_blogs_*` for list, get, archive, batch read/update/archive and multi-language | `cms_blog_*`, e.g. `cms_blog_list` | `blogResource: "posts"`, `"authors"` or `"tags"` |
+
+Unchanged: endpoints only one type has (`contacts_gdpr_delete`, landing page
+folders, blog post drafts and revisions, blog create/update, whose bodies differ
+per resource). `npm run list-tools -- --names` prints every tool with the endpoint
+it calls. POST endpoints that publish, schedule or restore existing content are
+now labelled 🟡 *updates data* instead of *creates data*.
+
+Two defaults change as well: `HUBSPOT_TOOL_MODE` is now `discovery` (set it to
+`all` to expose the endpoint tools themselves), and the server runs the access
+check at startup, which costs up to about 30 API calls per start
+(`HUBSPOT_CAPABILITY_CHECK=false` turns it off).
 
 ## Run from source (stdio, no Docker)
 
@@ -470,7 +524,7 @@ Communication Preferences v3 + v4).
 ```bash
 npm install
 npm run build       # compile TypeScript → dist/
-npm test            # run the Vitest suite (81 tests)
+npm test            # run the Vitest suite (150 tests)
 npm run list-tools  # print the categorized tool catalog (no credentials needed)
 npm run fetch-specs # refresh spec/ from HubSpot's public API index
 ```
@@ -486,11 +540,17 @@ publish a Docker image to the GitHub Container Registry.
 - **Paging**: CRM list tools use cursor paging — pass `limit` and the `after`
   cursor from `paging.next.after`. Ask for the properties you need via the
   `properties` parameter (arrays become repeated query params).
-- **Search**: the `*_search` tools take a JSON `body` with `filterGroups`,
-  `sorts`, `query`, `properties`, `limit` and `after`. HubSpot caps search at
-  ~5 req/s per token — the built-in search throttle keeps you under it.
-- **Batch tools** (`*_batch_read`, `*_batch_create`, …) are the efficient way
-  to touch many records — prefer them over loops of single calls.
+- **Selectors**: consolidated tools take `objectType` (`crm_objects_*`),
+  `pageType` (`cms_pages_*`) or `blogResource` (`cms_blog_*`). `objectType`
+  accepts names (`contacts`, `line_items`), objectTypeIds (`0-3`) and custom
+  object types (`2-12345`).
+- **Search**: `crm_objects_search` and the other `*_search` tools take a JSON
+  `body` with `filterGroups`, `sorts`, `query`, `properties`, `limit` and
+  `after`. HubSpot caps search at ~5 req/s per token — the built-in search
+  throttle keeps you under it.
+- **Batch tools** (`crm_objects_batch_read`, `crm_objects_batch_create`, …) are
+  the efficient way to touch many records — prefer them over loops of single
+  calls.
 - **Associations**: use the v4 association tools (`associations_*`) to link
   records, with optional labels via the association-schema tools.
 - **File uploads**: multipart tools accept file fields as

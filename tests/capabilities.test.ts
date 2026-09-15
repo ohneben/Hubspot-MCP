@@ -3,7 +3,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAllSpecs } from "../src/openapi.js";
 import { loadCatalog } from "../src/specs.js";
-import { pickProbeOperation, runCapabilities, scopesSatisfy } from "../src/capabilities.js";
+import {
+  pickProbeOperation,
+  runCapabilities,
+  scopesSatisfy,
+  summarizeProfile,
+  type CapabilityProfile,
+} from "../src/capabilities.js";
 import type { ServerConfig } from "../src/config.js";
 
 const specDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "spec");
@@ -113,9 +119,85 @@ describe("runCapabilities", () => {
       }),
     );
 
-    expect(probed).toEqual(["/crm/v3/objects/contacts"]);
+    expect(probed).toContain("/crm/v3/objects/contacts");
     const contacts = report.toolGroups.find((g: { group: string }) => g.group === "contacts");
     expect(contacts.probe.ok).toBe(true);
     expect(contacts.probe.endpoint).toBe("GET /crm/v3/objects/contacts");
+  });
+
+  it("classifies access per group and probes paid-tier groups on its own", async () => {
+    const fetchImpl = (async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/account-info/v3/details")) return json(200, { portalId: 77 });
+      if (u.endsWith("/oauth/v2/private-apps/get/access-token-info")) {
+        return json(200, { scopes: ["crm.objects.contacts.read", "hubdb"] });
+      }
+      if (u.endsWith("/account-info/v3/api-usage/daily/private-apps")) return json(200, []);
+      throw new Error(`unexpected url ${u}`);
+    }) as unknown as typeof fetch;
+
+    const probed: string[] = [];
+    const report = JSON.parse(
+      await runCapabilities(cfg(fetchImpl), operations, {}, async (_c, op) => {
+        probed.push(op.path);
+        return op.path.startsWith("/cms/v3/hubdb") ? { status: 403, ok: false } : { status: 200, ok: true };
+      }),
+    );
+    const group = (key: string) => report.toolGroups.find((g: { group: string }) => g.group === key);
+
+    // Free tier with its scope granted: usable without spending a probe.
+    expect(group("contacts").access).toBe("available");
+    expect(probed).not.toContain("/crm/v3/objects/contacts");
+    // Paid tier with its scope granted: probed, and the 403 means the plan or permission blocks it.
+    expect(probed.some((p) => p.startsWith("/cms/v3/hubdb"))).toBe(true);
+    expect(group("hubdb").access).toBe("blocked");
+    expect(group("deals").access).toBe("missing_scopes");
+  });
+
+  it("returns the startup result without calling HubSpot again", async () => {
+    const fetchImpl = (async () => {
+      throw new Error("no network call expected");
+    }) as unknown as typeof fetch;
+    const cache = {
+      profile: { checkedAt: "startup", account: {}, token: {}, toolGroups: [], notes: [] } as CapabilityProfile,
+    };
+    const report = JSON.parse(
+      await runCapabilities(cfg(fetchImpl), operations, {}, async () => {
+        throw new Error("no probe expected");
+      }, cache),
+    );
+    expect(report.checkedAt).toBe("startup");
+  });
+});
+
+describe("summarizeProfile", () => {
+  it("condenses the check for the server instructions", () => {
+    const text = summarizeProfile({
+      checkedAt: "2026-09-15T00:00:00.000Z",
+      account: { portalId: 77 },
+      token: {},
+      notes: [],
+      toolGroups: [
+        { group: "contacts", access: "available" },
+        { group: "deals", access: "missing_scopes" },
+        { group: "hubdb", access: "blocked" },
+      ],
+    } as unknown as CapabilityProfile);
+    expect(text).toContain("portal 77");
+    expect(text).toContain("1 of 3 API groups are usable");
+    expect(text).toContain("Missing scopes: deals.");
+    expect(text).toContain("Blocked by plan tier or permissions: hubdb.");
+  });
+
+  it("says so plainly when HubSpot could not be reached", () => {
+    const text = summarizeProfile({
+      checkedAt: "2026-09-15T00:00:00.000Z",
+      account: {},
+      token: { error: "Could not introspect token (HTTP 0)." },
+      notes: [],
+      toolGroups: [{ group: "contacts", access: "unverified" }],
+    } as unknown as CapabilityProfile);
+    expect(text).toContain("could not read the token's scopes");
+    expect(text).not.toContain("Not verified:");
   });
 });

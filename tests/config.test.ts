@@ -12,6 +12,7 @@ const ENV_KEYS = [
   "HUBSPOT_READ_ONLY",
   "HUBSPOT_INCLUDE_BETA",
   "HUBSPOT_TOOL_MODE",
+  "HUBSPOT_CAPABILITY_CHECK",
   "HUBSPOT_INCLUDE_GROUPS",
   "HUBSPOT_EXCLUDE_GROUPS",
   "HUBSPOT_ENABLE_GRAPHQL",
@@ -53,7 +54,8 @@ describe("loadConfig", () => {
     expect(cfg.searchRateLimiter).toBeDefined();
     expect(cfg.readOnly).toBe(false);
     expect(cfg.includeBeta).toBe(true);
-    expect(cfg.toolMode).toBe("all");
+    expect(cfg.toolMode).toBe("discovery");
+    expect(cfg.capabilityCheck).toBe(true);
     expect(cfg.enableGraphql).toBe(true);
     expect(cfg.enableRawRequest).toBe(true);
     expect(cfg.graphqlUrl).toBe("https://api.hubapi.com/collector/graphql");

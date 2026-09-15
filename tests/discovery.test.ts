@@ -6,6 +6,7 @@ import { loadCatalog } from "../src/specs.js";
 import { operationsToTools } from "../src/tools.js";
 import { discoveryTools, handleGetEndpoint, handleSearchEndpoints } from "../src/discovery.js";
 import type { ServerConfig } from "../src/config.js";
+import type { CapabilityProfile } from "../src/capabilities.js";
 
 const specDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "spec");
 const catalog = loadCatalog(specDir);
@@ -37,8 +38,9 @@ describe("discoveryTools", () => {
 describe("handleSearchEndpoints", () => {
   it("finds endpoints by keywords", () => {
     const out = handleSearchEndpoints(registry, { query: "contacts search" });
-    expect(out).toContain("contacts_search");
-    expect(out).toContain("POST /crm/v3/objects/contacts/search");
+    expect(out).toContain("crm_objects_search");
+    expect(out).toContain("POST /crm/v3/objects/{objectType}/search");
+    expect(out).toContain("objectType: ");
   });
 
   it("filters by group and category", () => {
@@ -56,13 +58,43 @@ describe("handleSearchEndpoints", () => {
 
 describe("handleGetEndpoint", () => {
   it("returns the full description and schema", () => {
-    const out = handleGetEndpoint(registryMap, { name: "contacts_search" });
-    expect(out).toContain("# contacts_search");
+    const out = handleGetEndpoint(registryMap, { name: "crm_objects_search" });
+    expect(out).toContain("# crm_objects_search");
     expect(out).toContain("🟢 READ-ONLY · query");
     expect(out).toContain('"type": "object"');
   });
 
   it("throws a helpful error for unknown names", () => {
     expect(() => handleGetEndpoint(registryMap, { name: "nope_nope" })).toThrow(/hubspot_search_endpoints/);
+  });
+});
+
+describe("access from the startup check", () => {
+  const profile = {
+    checkedAt: "2026-09-15T00:00:00.000Z",
+    account: {},
+    token: {},
+    notes: [],
+    toolGroups: [
+      { group: "contacts", access: "available", accessReason: "Scopes granted and no paid tier required." },
+      { group: "hubdb", access: "missing_scopes", accessReason: "The token has none of the scopes this group needs." },
+    ],
+  } as unknown as CapabilityProfile;
+
+  it("marks each search result", () => {
+    const out = handleSearchEndpoints(registry, { group: "hubdb", limit: 1 }, profile);
+    expect(out).toContain("access: missing scopes");
+  });
+
+  it("filters to usable tools on request", () => {
+    const out = handleSearchEndpoints(registry, { usable_only: true, limit: 100 }, profile);
+    expect(out).toContain("contacts_gdpr_delete");
+    expect(out).toContain("crm_objects_search");
+    expect(out).not.toContain("hubdb_");
+  });
+
+  it("breaks consolidated tools down by selector value", () => {
+    const out = handleGetEndpoint(registryMap, { name: "crm_objects_get" }, profile);
+    expect(out).toMatch(/Access for this token by objectType: .*usable: contacts/);
   });
 });

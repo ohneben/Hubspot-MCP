@@ -1,34 +1,37 @@
 import type { ServerConfig } from "./config.js";
 import type { Operation } from "./openapi.js";
-import { formatRequirements, HUB_NAMES, type HubKey } from "./specs.js";
+import { formatRequirements, HUB_NAMES, type CatalogEntry, type HubKey } from "./specs.js";
 import { categoryForOperation, safetyBucket } from "./categories.js";
 import type { ToolDefinition } from "./tools.js";
 
 /**
- * `hubspot_get_capabilities` — the "what can THIS portal actually do?" tool.
+ * The access check behind `hubspot_get_capabilities`: "what can THIS portal
+ * and token actually use?"
  *
  * HubSpot's API surface depends on which hubs and plan tiers an account has
  * (HubDB needs Content/Marketing Hub Professional, custom-object schemas need
- * Enterprise, …) and on which scopes the token was granted. Instead of letting
- * the model discover that through a wall of 403s, this tool reports it up
- * front:
+ * Enterprise, …) and on which scopes the token was granted. HubSpot has no API
+ * that returns the subscription, so the check combines what can be observed:
  *
  *   - account details (portal ID, type, currency, time zone, data hosting),
  *   - the token's granted scopes (private-app tokens and OAuth tokens),
  *   - today's API usage against the daily limit (private apps),
- *   - per resource group: how many of its endpoints the current token's
- *     scopes unlock, the plan tier HubSpot lists for it, and beta status,
- *   - optionally, live probes: one cheap read per requested group to verify
- *     end-to-end access empirically (some tier gates only show up as 403s).
+ *   - per API group: how many endpoints the scopes unlock, the plan tier
+ *     HubSpot publishes for it, and beta status,
+ *   - one cheap live read per paid-tier or beta group, because plan gates only
+ *     show up as a 403.
+ *
+ * The server runs it once at startup and keeps the result, so the model starts
+ * with an access status for every group instead of finding out through 403s.
  */
 export const CAPABILITIES_TOOL_NAME = "hubspot_get_capabilities";
 
 export function capabilitiesTool(): ToolDefinition {
   const description = [
-    "🟢 READ-ONLY · HubSpot account capability report",
-    "Reports what THIS HubSpot account + token can do: portal details, granted scopes, daily API usage, and — for every tool group — whether the current scopes unlock it, which plan tier HubSpot requires, and whether it is beta.",
-    "Call this first in a session (or when you hit a 403) to know which tools will work instead of finding out by trial and error. " +
-      'Optional "probe_groups" performs one cheap live read per named group to verify access end-to-end (plan gates often only surface as 403s).',
+    "🟢 READ-ONLY · HubSpot account access report",
+    "Reports what THIS HubSpot account and token can use: portal details, granted scopes, daily API usage, and for every API group an access status (available, missing_scopes, blocked, unverified) with the reason, the plan tier HubSpot requires and the scopes that would unlock it.",
+    "The server already ran this check at startup, probing each paid-tier or beta group with one cheap read, so a plain call returns that result without new API calls. " +
+      "Pass refresh=true after the token's scopes or the portal's subscription changed. probe_groups live-probes further groups, one API call each.",
   ].join("\n\n");
 
   return {
@@ -37,11 +40,15 @@ export function capabilitiesTool(): ToolDefinition {
     inputSchema: {
       type: "object",
       properties: {
+        refresh: {
+          type: "boolean",
+          description: "Run the check again instead of returning the startup result. Costs one API call per probed group. Default false.",
+        },
         probe_groups: {
           type: "array",
           items: { type: "string" },
           description:
-            'Group keys to live-probe with one parameter-free read each (e.g. ["contacts","hubdb"]). Costs one API call per group.',
+            'Extra group keys to live-probe with one parameter-free read each (e.g. ["contacts"]). Implies a fresh check. Costs one API call per group.',
         },
         include_api_usage: {
           type: "boolean",
@@ -147,7 +154,9 @@ export function scopesSatisfy(scopeAlternatives: string[][], granted: Set<string
   return scopeAlternatives.some((alt) => alt.every((s) => granted.has(s)));
 }
 
-interface GroupReport {
+export type GroupAccess = "available" | "missing_scopes" | "blocked" | "unverified";
+
+export interface GroupReport {
   group: string;
   api: string;
   area: string;
@@ -158,8 +167,21 @@ interface GroupReport {
   unlockedByScopes?: string;
   /** A sample scope set that would unlock the group when nothing is unlocked. */
   scopesNeeded?: string[];
+  access: GroupAccess;
+  accessReason: string;
   probe?: { status: number; ok: boolean; endpoint: string } | { skipped: string };
 }
+
+export interface CapabilityProfile {
+  checkedAt: string;
+  account: unknown;
+  token: Record<string, unknown>;
+  dailyApiUsage?: unknown;
+  toolGroups: GroupReport[];
+  notes: string[];
+}
+
+export type ProbeFn = (cfg: ServerConfig, op: Operation, args: unknown) => Promise<{ status: number; ok: boolean }>;
 
 /** Pick a cheap, parameter-free GET to probe a group with. */
 export function pickProbeOperation(ops: Operation[]): Operation | undefined {
@@ -171,32 +193,74 @@ export function pickProbeOperation(ops: Operation[]): Operation | undefined {
   return candidates.sort((a, b) => a.path.length - b.path.length)[0];
 }
 
-export async function runCapabilities(
+/** A group whose published plan tier or beta status can block a token that has the scopes. */
+function isGated(entry: CatalogEntry): boolean {
+  const plan = formatRequirements(entry.requirements);
+  return Boolean(plan && !plan.startsWith("any")) || entry.beta;
+}
+
+function decideAccess(
+  report: GroupReport,
+  gated: boolean,
+  scopesKnown: boolean,
+  unlocked: number,
+  total: number,
+): Pick<GroupReport, "access" | "accessReason"> {
+  if (scopesKnown && unlocked === 0) {
+    const needed = report.scopesNeeded ? ` (for example ${report.scopesNeeded.join(", ")})` : "";
+    return { access: "missing_scopes", accessReason: `The token has none of the scopes this group needs${needed}.` };
+  }
+  const partial = scopesKnown && unlocked < total ? ` Its scopes cover ${unlocked} of ${total} endpoints.` : "";
+  const probe = report.probe;
+  if (probe && "status" in probe) {
+    if (probe.ok) return { access: "available", accessReason: `Verified: ${probe.endpoint} returned ${probe.status}.${partial}` };
+    if (probe.status === 403) {
+      return {
+        access: "blocked",
+        accessReason: `${probe.endpoint} returned 403: the portal's plan${report.plan ? ` (needs ${report.plan})` : ""} or the token user's permissions do not allow it.`,
+      };
+    }
+    if (probe.status === 404 && report.beta) {
+      return { access: "blocked", accessReason: `${probe.endpoint} returned 404: this beta API is probably not enabled for the portal.` };
+    }
+    return { access: "unverified", accessReason: `${probe.endpoint} returned ${probe.status ? `HTTP ${probe.status}` : "no response"}.${partial}` };
+  }
+  if (gated) {
+    const skipped = probe && "skipped" in probe ? ` (${probe.skipped})` : "";
+    return { access: "unverified", accessReason: `Needs ${report.plan ?? "beta access"}; not verified${skipped}.${partial}` };
+  }
+  if (scopesKnown) return { access: "available", accessReason: `Scopes granted and no paid tier required.${partial}` };
+  return { access: "unverified", accessReason: "The token's scopes could not be read." };
+}
+
+export interface CheckOptions {
+  /** Probe every paid-tier or beta group the scopes do not already rule out. Default true. */
+  probeGated?: boolean;
+  /** Additional group keys to probe. */
+  probeGroups?: Set<string>;
+  includeUsage?: boolean;
+}
+
+export async function checkCapabilities(
   cfg: ServerConfig,
   operations: Operation[],
-  rawArgs: unknown,
-  callProbe: (cfg: ServerConfig, op: Operation, args: unknown) => Promise<{ status: number; ok: boolean }>,
-): Promise<string> {
-  const args = asRecord(rawArgs);
-  const includeUsage = args.include_api_usage !== false;
-  const probeGroups = new Set(
-    Array.isArray(args.probe_groups) ? (args.probe_groups as unknown[]).map((g) => String(g).toLowerCase()) : [],
-  );
-
+  callProbe: ProbeFn,
+  options: CheckOptions = {},
+): Promise<CapabilityProfile> {
   const [account, tokenInfo] = await Promise.all([
     simpleFetch(cfg, "GET", `${cfg.baseUrl}/account-info/v3/details`),
     fetchTokenInfo(cfg),
   ]);
 
   const granted = new Set((tokenInfo.scopes as string[]) ?? []);
+  const scopesKnown = granted.size > 0;
 
   let usage: unknown;
-  if (includeUsage && cfg.accessToken.startsWith("pat-")) {
+  if (options.includeUsage !== false && cfg.accessToken.startsWith("pat-")) {
     const res = await simpleFetch(cfg, "GET", `${cfg.baseUrl}/account-info/v3/api-usage/daily/private-apps`);
     usage = res.ok ? res.body : { note: `API usage unavailable (HTTP ${res.status}).` };
   }
 
-  // ── Per-group report ────────────────────────────────────────────────────
   const byGroup = new Map<string, Operation[]>();
   for (const op of operations) {
     const list = byGroup.get(op.group) ?? [];
@@ -204,52 +268,63 @@ export async function runCapabilities(
     byGroup.set(op.group, list);
   }
 
-  const groups: GroupReport[] = [];
-  for (const [group, ops] of [...byGroup.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const entry = ops[0].entry;
-    const counts = { read: 0, write: 0, destructive: 0 };
-    let unlocked = 0;
-    for (const op of ops) {
-      counts[safetyBucket(categoryForOperation(op.method, op.path).id)]++;
-      if (granted.size > 0 && scopesSatisfy(op.scopeAlternatives, granted)) unlocked++;
-    }
-
-    const report: GroupReport = {
-      group,
-      api: entry.name,
-      area: entry.area,
-      plan: formatRequirements(entry.requirements),
-      ...(entry.beta ? { beta: true as const } : {}),
-      tools: counts,
-    };
-    if (granted.size > 0) {
-      report.unlockedByScopes = `${unlocked}/${ops.length}`;
-      if (unlocked === 0) {
-        const sample = ops[0].scopeAlternatives[0];
-        if (sample && sample.length > 0) report.scopesNeeded = sample;
-      }
-    }
-
-    if (probeGroups.has(group.toLowerCase())) {
-      const probeOp = pickProbeOperation(ops);
-      if (!probeOp) {
-        report.probe = { skipped: "no parameter-free read endpoint in this group" };
-      } else {
-        const probeArgs = probeOp.parameters.some((p) => p.in === "query" && p.name === "limit") ? { limit: 1 } : {};
-        try {
-          const res = await callProbe(cfg, probeOp, probeArgs);
-          report.probe = { status: res.status, ok: res.ok, endpoint: `GET ${probeOp.path}` };
-        } catch (err) {
-          report.probe = { skipped: `probe failed: ${err instanceof Error ? err.message : String(err)}` };
+  const groups = await Promise.all(
+    [...byGroup.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(async ([group, ops]): Promise<GroupReport> => {
+        const entry = ops[0].entry;
+        const counts = { read: 0, write: 0, destructive: 0 };
+        let unlocked = 0;
+        for (const op of ops) {
+          counts[safetyBucket(categoryForOperation(op.method, op.path).id)]++;
+          if (scopesKnown && scopesSatisfy(op.scopeAlternatives, granted)) unlocked++;
         }
-      }
-    }
 
-    groups.push(report);
-  }
+        const report: GroupReport = {
+          group,
+          api: entry.name,
+          area: entry.area,
+          plan: formatRequirements(entry.requirements),
+          ...(entry.beta ? { beta: true as const } : {}),
+          tools: counts,
+          access: "unverified",
+          accessReason: "",
+        };
+        if (scopesKnown) {
+          report.unlockedByScopes = `${unlocked}/${ops.length}`;
+          if (unlocked === 0) {
+            const sample = ops[0].scopeAlternatives[0];
+            if (sample && sample.length > 0) report.scopesNeeded = sample;
+          }
+        }
+
+        const ruledOutByScopes = scopesKnown && unlocked === 0;
+        const wantProbe =
+          !ruledOutByScopes &&
+          ((options.probeGated !== false && isGated(entry)) || Boolean(options.probeGroups?.has(group.toLowerCase())));
+        if (wantProbe) {
+          const probeOp = pickProbeOperation(ops);
+          if (!probeOp) {
+            report.probe = { skipped: "no parameter-free read endpoint in this group" };
+          } else {
+            const probeArgs = probeOp.parameters.some((p) => p.in === "query" && p.name === "limit") ? { limit: 1 } : {};
+            try {
+              const res = await callProbe(cfg, probeOp, probeArgs);
+              report.probe = { status: res.status, ok: res.ok, endpoint: `GET ${probeOp.path}` };
+            } catch (err) {
+              report.probe = { skipped: `probe failed: ${err instanceof Error ? err.message : String(err)}` };
+            }
+          }
+        }
+
+        Object.assign(report, decideAccess(report, isGated(entry), scopesKnown, unlocked, ops.length));
+        return report;
+      }),
+  );
 
   const hubRequirementKeys = Object.keys(HUB_NAMES) as HubKey[];
-  const result = {
+  return {
+    checkedAt: new Date().toISOString(),
     account: account.ok
       ? account.body
       : { note: `Account details unavailable (HTTP ${account.status}). The token may lack the account-info scopes.` },
@@ -257,11 +332,63 @@ export async function runCapabilities(
     ...(usage !== undefined ? { dailyApiUsage: usage } : {}),
     toolGroups: groups,
     notes: [
-      "unlockedByScopes counts endpoints whose required scopes this token holds — it does not check plan tier.",
-      "plan is HubSpot's published minimum tier per hub for the API; probes verify real access (403 usually = missing scope or plan).",
+      "access: available = scopes granted and, for paid-tier or beta groups, a live read succeeded; missing_scopes = the token lacks every scope the group needs; blocked = a live read returned 403 (plan tier or user permission) or 404 for a beta; unverified = could not be confirmed.",
+      "unlockedByScopes counts endpoints whose required scopes this token holds; it does not check plan tier.",
+      "plan is HubSpot's published minimum tier per hub for the API. HubSpot has no API that returns the portal's subscription, so tiers are verified by probing.",
       `Hub keys: ${hubRequirementKeys.map((k) => `${k}=${HUB_NAMES[k]}`).join(", ")}.`,
     ],
   };
+}
 
-  return JSON.stringify(result, null, 2);
+/** Access status per group key. */
+export function accessByGroup(profile: CapabilityProfile | undefined): Map<string, GroupReport> {
+  return new Map((profile?.toolGroups ?? []).map((g) => [g.group, g]));
+}
+
+const listUpTo = (items: string[], max: number) =>
+  items.length > max ? `${items.slice(0, max).join(", ")} and ${items.length - max} more` : items.join(", ");
+
+/** A few sentences for the server instructions, so the model starts with the result. */
+export function summarizeProfile(profile: CapabilityProfile): string {
+  const groupsWith = (access: GroupAccess) => profile.toolGroups.filter((g) => g.access === access).map((g) => g.group);
+  const tokenError = typeof profile.token.error === "string" ? profile.token.error : undefined;
+  if (tokenError && groupsWith("available").length === 0) {
+    return `The access check at ${profile.checkedAt} could not read the token's scopes (${tokenError}), so no API group is confirmed. Call ${CAPABILITIES_TOOL_NAME} with refresh=true once HubSpot is reachable.`;
+  }
+  const portal = asRecord(profile.account).portalId;
+  const parts = [
+    `Access check at ${profile.checkedAt}${portal ? ` for portal ${portal}` : ""}: ${groupsWith("available").length} of ${profile.toolGroups.length} API groups are usable with this token.`,
+  ];
+  const missing = groupsWith("missing_scopes");
+  if (missing.length > 0) parts.push(`Missing scopes: ${listUpTo(missing, 25)}.`);
+  const blocked = groupsWith("blocked");
+  if (blocked.length > 0) parts.push(`Blocked by plan tier or permissions: ${listUpTo(blocked, 25)}.`);
+  const unverified = groupsWith("unverified");
+  if (unverified.length > 0) parts.push(`Not verified: ${listUpTo(unverified, 25)}.`);
+  parts.push(`Prefer tools in usable groups; ${CAPABILITIES_TOOL_NAME} gives the reason and the scopes to add for each group.`);
+  return parts.join(" ");
+}
+
+export async function runCapabilities(
+  cfg: ServerConfig,
+  operations: Operation[],
+  rawArgs: unknown,
+  callProbe: ProbeFn,
+  cache?: { profile?: CapabilityProfile },
+): Promise<string> {
+  const args = asRecord(rawArgs);
+  const probeGroups = new Set(
+    Array.isArray(args.probe_groups) ? (args.probe_groups as unknown[]).map((g) => String(g).toLowerCase()) : [],
+  );
+
+  if (cache?.profile && args.refresh !== true && probeGroups.size === 0) {
+    return JSON.stringify(cache.profile, null, 2);
+  }
+
+  const profile = await checkCapabilities(cfg, operations, callProbe, {
+    probeGroups,
+    includeUsage: args.include_api_usage !== false,
+  });
+  if (cache) cache.profile = profile;
+  return JSON.stringify(profile, null, 2);
 }

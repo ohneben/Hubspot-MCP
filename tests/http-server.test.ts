@@ -31,6 +31,10 @@ const CREDS = {
   // that shape as a leak even when the value is obviously a placeholder.
   HUBSPOT_ACCESS_TOKEN: "test-token-no-network-calls-are-made",
   HUBSPOT_BASE_URL: "https://example.test",
+  // The startup access check would call the API.
+  HUBSPOT_CAPABILITY_CHECK: "false",
+  // The session cases list the full endpoint catalog, not the discovery tools.
+  HUBSPOT_TOOL_MODE: "all",
 };
 const TOKEN = "s3cret-token-long-enough";
 

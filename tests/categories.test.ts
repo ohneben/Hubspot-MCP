@@ -71,6 +71,15 @@ describe("categoryForOperation", () => {
     expect(categoryForOperation("post", "/crm/v3/imports/{importId}/cancel").id).toBe("update");
   });
 
+  it("treats publishing and restoring existing content as updates, not creates", () => {
+    expect(categoryForOperation("post", "/cms/v3/pages/site-pages/{objectId}/draft/push-live").id).toBe("update");
+    expect(categoryForOperation("post", "/cms/v3/blogs/posts/schedule").id).toBe("update");
+    expect(categoryForOperation("post", "/cms/v3/pages/landing-pages/{objectId}/revisions/{revisionId}/restore").id).toBe("update");
+    // Cloning and language variations do create new content.
+    expect(categoryForOperation("post", "/cms/v3/pages/site-pages/clone").id).toBe("create");
+    expect(categoryForOperation("post", "/cms/v3/blogs/posts/multi-language/create-language-variation").id).toBe("create");
+  });
+
   it("treats token revocation as destructive", () => {
     expect(categoryForOperation("post", "/oauth/v3/token/revoke").id).toBe("delete");
     expect(categoryForOperation("delete", "/oauth/v1/refresh-tokens/{token}").id).toBe("delete");
