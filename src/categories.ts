@@ -252,6 +252,13 @@ export const RULES: Rule[] = [
     category: "import",
   },
   {
+    why: "Publishing, scheduling, restoring or regrouping existing content changes its state; it creates no record",
+    match: (m, p) =>
+      m === "post" &&
+      /\/(publish|unpublish|push-live|reset|restore|restore-to-draft|schedule|attach-to-lang-group|detach-from-lang-group|update-languages|complete|unsubscribe-all)$/i.test(p),
+    category: "update",
+  },
+  {
     why: "Cancelling a job/import/event is a reversible state change",
     match: (m, p) => m === "post" && ends(p, "/cancel"),
     category: "update",

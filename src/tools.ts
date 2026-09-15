@@ -1,4 +1,26 @@
+import { isDeepStrictEqual } from "node:util";
 import { categoryForOperation, safetyBucket, type CategoryId } from "./categories.js";
+import {
+  consolidatedDetail,
+  consolidatedPurpose,
+  dispatchDescription,
+  planConsolidation,
+  primaryVariant,
+  resolveVariant,
+  type ConsolidatedEndpoint,
+  type Variant,
+} from "./consolidate.js";
+import {
+  actionOf,
+  assembleDescription,
+  cleanText,
+  clip,
+  fallbackParamDescription,
+  nounFor,
+  purposeFor,
+  usageGuidance,
+  type ActionKey,
+} from "./describe.js";
 import type { JsonSchema, Operation, ParameterSpec } from "./openapi.js";
 import { formatRequirements } from "./specs.js";
 
@@ -15,10 +37,29 @@ export interface ToolDefinition {
   description: string;
   inputSchema: Record<string, unknown>;
   annotations: ToolAnnotations;
-  /** The REST operation this tool proxies, or `null` for special tools. */
+  /** The REST operation this tool proxies (the primary variant for a
+   * consolidated tool), or `null` for special tools. */
   operation: Operation | null;
+  /** Consolidated tools only: every endpoint the tool reaches, picked by one argument. */
+  consolidated?: ConsolidatedEndpoint;
+  /** Method and path shown to the model; a generic template for consolidated tools. */
+  endpoint?: { method: string; path: string; api: string; area: string };
   group?: string;
   category?: CategoryId;
+}
+
+/** Every operation a tool can call. */
+export function toolOperations(tool: ToolDefinition): Operation[] {
+  if (tool.consolidated) return tool.consolidated.variants.map((v) => v.operation);
+  return tool.operation ? [tool.operation] : [];
+}
+
+/** The operation a call runs, with arguments in that operation's own names. */
+export function resolveCall(tool: ToolDefinition, rawArgs: unknown): { operation: Operation; args: Record<string, unknown> } {
+  const args = (rawArgs && typeof rawArgs === "object" ? rawArgs : {}) as Record<string, unknown>;
+  if (tool.consolidated) return resolveVariant(tool.consolidated, args);
+  if (!tool.operation) throw new Error(`${tool.name} does not call a HubSpot endpoint.`);
+  return { operation: tool.operation, args };
 }
 
 export interface ToolFilterOptions {
@@ -219,6 +260,10 @@ export function toolNameForOperation(op: Operation): string {
 function paramToSchema(p: ParameterSpec): JsonSchema {
   const base: Record<string, unknown> = { ...(p.schema ?? { type: "string" }) };
   if (p.description && !base.description) base.description = p.description;
+  if (!base.description) {
+    const hint = fallbackParamDescription(p.name);
+    if (hint) base.description = hint;
+  }
   // A renamed (sanitized) parameter still reaches HubSpot under its raw name.
   if (p.argName && p.argName !== p.name && !p.dynamicPrefix) {
     base.description = [base.description, `Sent to HubSpot as "${p.name}".`].filter(Boolean).join(" ");
@@ -258,7 +303,28 @@ function buildInputSchema(op: Operation): Record<string, unknown> {
 
   const schema: Record<string, unknown> = { type: "object", properties, additionalProperties: false };
   if (required.length > 0) schema.required = required;
-  return schema;
+  return compactSchema(schema) as Record<string, unknown>;
+}
+
+const EXAMPLE_KEYS = new Set(["example", "examples"]);
+
+/**
+ * Keep what a model needs to fill arguments in: every field, type, enum and
+ * required list, plus the descriptions of the top-level arguments and of the
+ * body's own fields. Examples and prose nested deeper are dropped; they were a
+ * large share of the tool list and rarely change what the model sends. Keys of
+ * a `properties` map are field names and always stay.
+ */
+function compactSchema(schema: unknown, depth = 0, isPropertyMap = false): unknown {
+  if (Array.isArray(schema)) return schema.map((s) => compactSchema(s, depth + 1));
+  if (!schema || typeof schema !== "object") return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (!isPropertyMap && EXAMPLE_KEYS.has(k)) continue;
+    if (!isPropertyMap && (k === "description" || k === "title") && depth > 2) continue;
+    out[k] = compactSchema(v, isPropertyMap ? depth : depth + 1, !isPropertyMap && k === "properties");
+  }
+  return out;
 }
 
 /** Prettify a group key into a human title, e.g. `marketing-emails` → `Marketing Emails`. */
@@ -270,33 +336,178 @@ export function prettyGroup(group: string): string {
     .trim();
 }
 
-function scopesLine(op: Operation): string | undefined {
-  const [first, ...rest] = op.scopeAlternatives;
+function scopesLine(scopeAlternatives: string[][]): string | undefined {
+  const [first, ...rest] = scopeAlternatives;
   if (!first || first.length === 0) return undefined;
   const shown = first.slice(0, 3).join(", ") + (first.length > 3 ? ", …" : "");
   return rest.length > 0 ? `Scopes: ${shown} (or ${rest.length} alternative scope set${rest.length > 1 ? "s" : ""})` : `Scopes: ${shown}`;
 }
 
-function buildDescription(op: Operation): string {
-  const meta = categoryForOperation(op.method, op.path);
-  const lines: string[] = [];
-  lines.push(`${meta.banner} · ${op.entry.name} (${op.entry.area}) · ${op.method.toUpperCase()} ${op.path}`);
-  if (op.summary) lines.push(op.summary.trim());
-  lines.push(meta.blurb);
+const BETA_NOTE = "⚠️ Beta/preview API — may change without notice.";
 
+function endpointFacts(op: Operation): string[] {
   const facts: string[] = [];
   const plan = formatRequirements(op.entry.requirements);
   if (plan) facts.push(`Plan: ${plan}.`);
-  const scopes = scopesLine(op);
+  const scopes = scopesLine(op.scopeAlternatives);
   if (scopes) facts.push(`${scopes}.`);
-  if (op.entry.beta) facts.push("⚠️ Beta/preview API — may change without notice.");
-  if (facts.length > 0) lines.push(facts.join(" "));
+  if (op.entry.beta) facts.push(BETA_NOTE);
+  return facts;
+}
 
-  if (op.description) {
-    const desc = op.description.trim();
-    if (desc && desc !== op.summary) lines.push(desc.length > 400 ? desc.slice(0, 400) + "…" : desc);
+function endpointDetail(op: Operation): string | undefined {
+  const detail = cleanText(op.description);
+  if (!detail || detail === cleanText(op.summary)) return undefined;
+  return clip(detail, 400);
+}
+
+function consolidatedFacts(ep: ConsolidatedEndpoint): string[] {
+  const named = ep.variants.filter((v) => !v.wildcard);
+  const reference = named.length > 0 ? named : ep.variants;
+  const param = ep.family.param;
+  const facts: string[] = [];
+
+  const plans = new Set(reference.map((v) => formatRequirements(v.operation.entry.requirements) ?? ""));
+  if (plans.size > 1) {
+    facts.push(`Plan: depends on ${param}; see that parameter.`);
+  } else {
+    const [plan] = plans;
+    if (plan) facts.push(`Plan: ${plan}.`);
   }
-  return lines.join("\n\n");
+
+  const alternatives = reference.map((v) => v.operation.scopeAlternatives);
+  if (alternatives.every((a) => isDeepStrictEqual(a, alternatives[0]))) {
+    const scopes = scopesLine(alternatives[0]);
+    if (scopes) facts.push(`${scopes}.`);
+  } else {
+    const hint = ep.family.scopeHint ? `, ${ep.family.scopeHint}` : "";
+    facts.push(`Scopes: depend on ${param}${hint}. A 403 response names the missing scope.`);
+  }
+
+  if (reference.every((v) => v.operation.entry.beta)) facts.push(BETA_NOTE);
+  return facts;
+}
+
+type SiblingIndex = Map<string, Map<ActionKey, string>>;
+
+function siblingSlot(tool: ToolDefinition): { key: string; action: ActionKey } {
+  // A consolidated path ends in its selector placeholder (`…/objects/{objectType}`),
+  // which is a collection, not a record ID, so classify it as a fixed segment.
+  const selector = tool.consolidated ? `{${tool.consolidated.family.param}}` : undefined;
+  const path = selector ? tool.endpoint!.path.replace(selector, "variant") : tool.endpoint!.path;
+  const { action, base } = actionOf(tool.endpoint!.method, path);
+  return { key: `${tool.group}|${base}`, action };
+}
+
+/** Tools on the same resource, by what they do, so descriptions can point to the better fit. */
+function buildSiblingIndex(tools: ToolDefinition[]): SiblingIndex {
+  const index: SiblingIndex = new Map();
+  for (const tool of tools) {
+    const { key, action } = siblingSlot(tool);
+    if (action === "other") continue;
+    const slots = index.get(key) ?? new Map<ActionKey, string>();
+    if (!slots.has(action)) slots.set(action, tool.name);
+    index.set(key, slots);
+  }
+  return index;
+}
+
+function describeTool(tool: ToolDefinition, index: SiblingIndex): string {
+  const op = tool.operation!;
+  const endpoint = tool.endpoint!;
+  const ep = tool.consolidated;
+  const meta = categoryForOperation(op.method, op.path);
+  const { key, action } = siblingSlot(tool);
+  const slots = index.get(key);
+
+  const guidance = usageGuidance(action, {
+    sibling: (a) => {
+      const name = slots?.get(a);
+      return name && name !== tool.name ? name : undefined;
+    },
+    noun: ep ? ep.family.noun : nounFor(actionOf(endpoint.method, endpoint.path).base),
+    crmObjects: endpoint.path.startsWith("/crm/v3/objects/"),
+    cursor: "after" in ((tool.inputSchema.properties as Record<string, unknown>) ?? {}),
+  });
+
+  return assembleDescription({
+    banner: meta.banner,
+    purpose: ep ? consolidatedPurpose(ep) : purposeFor(op.summary, op.method, op.path),
+    guidance,
+    blurb: meta.blurb,
+    facts: ep ? consolidatedFacts(ep) : endpointFacts(op),
+    detail: ep ? consolidatedDetail(ep) : endpointDetail(op),
+    endpoint: `${endpoint.method.toUpperCase()} ${endpoint.path} (${endpoint.api}, ${endpoint.area})`,
+  });
+}
+
+/** Apply `fn` to every prose `description` in a schema, leaving body fields named "description" alone. */
+function mapDescriptions(schema: unknown, fn: (text: string) => string, isPropertyMap = false): unknown {
+  if (Array.isArray(schema)) return schema.map((s) => mapDescriptions(s, fn));
+  if (!schema || typeof schema !== "object") return schema;
+  return Object.fromEntries(
+    Object.entries(schema).map(([k, v]) => [
+      k,
+      !isPropertyMap && k === "description" && typeof v === "string"
+        ? fn(v)
+        : mapDescriptions(v, fn, !isPropertyMap && k === "properties"),
+    ]),
+  );
+}
+
+/** The primary variant's schema, with the dispatch argument first and path arguments under their generic names. */
+function consolidatedInputSchema(ep: ConsolidatedEndpoint, primary: Variant): Record<string, unknown> {
+  const base = buildInputSchema(primary.operation);
+  const baseRequired = new Set((base.required as string[] | undefined) ?? []);
+  const values = ep.variants.filter((v) => !v.wildcard).map((v) => v.value);
+  const dispatch: Record<string, unknown> = { type: "string", description: dispatchDescription(ep) };
+  if (!ep.variants.some((v) => v.wildcard)) dispatch.enum = values;
+
+  const properties: Record<string, unknown> = { [ep.family.param]: dispatch };
+  const required = [ep.family.param];
+  const neutral = (text: string) => ep.family.neutralize(text, primary);
+  for (const [key, schema] of Object.entries(base.properties as Record<string, Record<string, unknown>>)) {
+    if (primary.wildcard && key === primary.dispatchArgKey) continue;
+    const position = primary.pathArgKeys.indexOf(key);
+    const outKey = position >= 0 ? ep.pathArgs[position] : key;
+    if (outKey in properties) throw new Error(`${ep.name}: argument "${outKey}" is defined twice.`);
+    let out = mapDescriptions(schema, neutral) as Record<string, unknown>;
+    if (outKey !== key) out = { ...out, description: fallbackParamDescription(outKey) ?? out.description };
+    properties[outKey] = out;
+    if (baseRequired.has(key)) required.push(outKey);
+  }
+  return { type: "object", properties, required, additionalProperties: false };
+}
+
+function consolidatedTool(ep: ConsolidatedEndpoint): ToolDefinition {
+  const primary = primaryVariant(ep);
+  const op = primary.operation;
+  const meta = categoryForOperation(op.method, op.path);
+  return {
+    name: ep.name,
+    description: "",
+    inputSchema: consolidatedInputSchema(ep, primary),
+    annotations: { title: consolidatedPurpose(ep).replace(/\.$/, ""), ...meta.annotations },
+    operation: op,
+    consolidated: ep,
+    endpoint: { method: ep.method, path: ep.path, api: ep.family.label, area: op.entry.area },
+    group: ep.family.group,
+    category: meta.id,
+  };
+}
+
+function endpointTool(op: Operation, name: string): ToolDefinition {
+  const meta = categoryForOperation(op.method, op.path);
+  return {
+    name,
+    description: "",
+    inputSchema: buildInputSchema(op),
+    annotations: { title: purposeFor(op.summary, op.method, op.path).replace(/\.$/, ""), ...meta.annotations },
+    operation: op,
+    endpoint: { method: op.method, path: op.path, api: `${op.entry.name} API`, area: op.entry.area },
+    group: op.group,
+    category: meta.id,
+  };
 }
 
 /* ─────────────────────────── filtering ─────────────────────────── */
@@ -327,7 +538,35 @@ export function operationsToTools(
   operations: Operation[],
   opts: ToolFilterOptions = {},
 ): ToolDefinition[] {
+  // Consolidation is planned over the full spec set so tool names never change
+  // with the include/exclude/read-only filters; the filters only narrow which
+  // variants a consolidated tool can reach.
+  const planOf = new Map<Operation, ConsolidatedEndpoint>();
+  for (const ep of planConsolidation(operations)) {
+    for (const v of ep.variants) planOf.set(v.operation, ep);
+  }
+
+  const kept = new Set(filterOperations(operations, opts));
+  const drafts: Array<{ op: Operation; ep?: ConsolidatedEndpoint }> = [];
+  const planned = new Set<ConsolidatedEndpoint>();
+  for (const op of operations) {
+    if (!kept.has(op)) continue;
+    const ep = planOf.get(op);
+    if (!ep) {
+      drafts.push({ op });
+    } else if (!planned.has(ep)) {
+      planned.add(ep);
+      drafts.push({ op, ep: { ...ep, variants: ep.variants.filter((v) => kept.has(v.operation)) } });
+    }
+  }
+
+  // Consolidated names are fixed, so they are claimed before any derived name.
   const used = new Set<string>();
+  for (const { ep } of drafts) {
+    if (!ep) continue;
+    if (used.has(ep.name)) throw new Error(`Two consolidated tools would both be named ${ep.name}.`);
+    used.add(ep.name);
+  }
   const tools: ToolDefinition[] = [];
 
   // Append a suffix while keeping the name legal: trim the BASE, never the
@@ -336,7 +575,11 @@ export function operationsToTools(
   const withSuffix = (base: string, suffix: string) =>
     `${base.slice(0, Math.max(1, MCP_TOOL_NAME_MAX - suffix.length - 1)).replace(/_+$/, "")}_${suffix}`;
 
-  for (const op of filterOperations(operations, opts)) {
+  for (const { op, ep } of drafts) {
+    if (ep) {
+      tools.push(consolidatedTool(ep));
+      continue;
+    }
     const baseName = toolNameForOperation(op) || "tool";
 
     // Resolve the (rare) collision: try the HTTP method, then a numeric suffix.
@@ -351,20 +594,11 @@ export function operationsToTools(
       name = withSuffix(baseName, String(i));
     }
     used.add(name);
-
-    const meta = categoryForOperation(op.method, op.path);
-    const title = op.summary?.trim() || `${op.entry.name}: ${op.method.toUpperCase()} ${op.path}`;
-
-    tools.push({
-      name,
-      description: buildDescription(op),
-      inputSchema: buildInputSchema(op),
-      annotations: { title, ...meta.annotations },
-      operation: op,
-      group: op.group,
-      category: meta.id,
-    });
+    tools.push(endpointTool(op, name));
   }
 
+  // Descriptions last: they name sibling tools, so every name must be final.
+  const index = buildSiblingIndex(tools);
+  for (const tool of tools) tool.description = describeTool(tool, index);
   return tools;
 }

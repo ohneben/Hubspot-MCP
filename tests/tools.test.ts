@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAllSpecs } from "../src/openapi.js";
 import { loadCatalog } from "../src/specs.js";
-import { operationsToTools } from "../src/tools.js";
+import { operationsToTools, toolOperations } from "../src/tools.js";
 
 const specDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "spec");
 const catalog = loadCatalog(specDir);
@@ -12,8 +12,8 @@ const tools = operationsToTools(operations);
 const byName = new Map(tools.map((t) => [t.name, t]));
 
 describe("operationsToTools", () => {
-  it("produces exactly one tool per operation (no filter)", () => {
-    expect(tools.length).toBe(operations.length);
+  it("reaches every operation exactly once (no filter)", () => {
+    expect(tools.flatMap(toolOperations).length).toBe(operations.length);
   });
 
   it("gives every tool a unique, MCP-legal name", () => {
@@ -28,19 +28,16 @@ describe("operationsToTools", () => {
 
   it("derives friendly, predictable names for the flagship endpoints", () => {
     for (const expected of [
-      "contacts_list",
-      "contacts_get",
-      "contacts_create",
-      "contacts_update",
-      "contacts_archive",
-      "contacts_search",
-      "contacts_merge",
+      "crm_objects_list",
+      "crm_objects_get",
+      "crm_objects_create",
+      "crm_objects_update",
+      "crm_objects_archive",
+      "crm_objects_search",
+      "crm_objects_merge",
+      "crm_objects_batch_upsert",
       "contacts_gdpr_delete",
-      "contacts_batch_upsert",
-      "deals_list",
-      "deals_search",
-      "companies_create",
-      "tickets_search",
+      "cms_pages_draft_push_live",
       "files_upload",
       "hubdb_tables_get_all",
       "lists_memberships_add",
@@ -67,8 +64,8 @@ describe("operationsToTools", () => {
   });
 
   it("includes required scopes in descriptions", () => {
-    const t = byName.get("contacts_list")!;
-    expect(t.description).toMatch(/Scopes: .*crm\.objects\.contacts\.read/);
+    const t = byName.get("contacts_gdpr_delete")!;
+    expect(t.description).toMatch(/Scopes: .*crm\.objects\.contacts\.write/);
   });
 
   it("marks beta APIs in the description", () => {
@@ -82,6 +79,31 @@ describe("operationsToTools", () => {
       expect(t.inputSchema.type).toBe("object");
       expect(t.inputSchema.additionalProperties).toBe(false);
     }
+  });
+
+  it("keeps input schemas compact: no examples, no prose below the body's own fields", () => {
+    const offenders: string[] = [];
+    const walk = (node: unknown, depth: number, isPropertyMap: boolean, path: string): void => {
+      if (Array.isArray(node)) {
+        node.forEach((n, i) => walk(n, depth + 1, false, `${path}[${i}]`));
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+      for (const [k, v] of Object.entries(node)) {
+        if (!isPropertyMap && (k === "example" || k === "examples")) offenders.push(`${path}.${k}`);
+        if (!isPropertyMap && k === "description" && depth > 2) offenders.push(`${path}.${k}`);
+        walk(v, isPropertyMap ? depth : depth + 1, !isPropertyMap && k === "properties", `${path}.${k}`);
+      }
+    };
+    for (const t of tools) walk(t.inputSchema, 0, false, t.name);
+    expect(offenders.slice(0, 5)).toEqual([]);
+
+    // The body's own fields keep their descriptions.
+    const search = byName.get("crm_objects_search")!.inputSchema.properties as Record<
+      string,
+      { properties?: Record<string, { description?: string }> }
+    >;
+    expect(search.body.properties?.filterGroups?.description).toBeTruthy();
   });
 
   it("only exposes Anthropic-legal property keys — one bad key would break the whole client", () => {
@@ -138,7 +160,7 @@ describe("operationsToTools", () => {
     });
 
     it("keeps POST searches available in read-only mode", () => {
-      expect(readTools.some((t) => t.name === "contacts_search")).toBe(true);
+      expect(readTools.some((t) => t.name === "crm_objects_search")).toBe(true);
     });
   });
 
@@ -146,7 +168,7 @@ describe("operationsToTools", () => {
     it("include-list keeps only the named groups", () => {
       const only = operationsToTools(operations, { includeGroups: new Set(["contacts", "deals"]) });
       expect(only.length).toBeGreaterThan(0);
-      for (const t of only) expect(["contacts", "deals"]).toContain(t.group);
+      for (const t of only) for (const op of toolOperations(t)) expect(["contacts", "deals"]).toContain(op.group);
     });
 
     it("supports area wildcards like cms:*", () => {
@@ -173,7 +195,7 @@ describe("operationsToTools", () => {
     it("drops developer-preview APIs when includeBeta is false", () => {
       const stable = operationsToTools(operations, { includeBeta: false });
       expect(stable.length).toBeLessThan(tools.length);
-      expect(stable.every((t) => !t.operation!.entry.beta)).toBe(true);
+      expect(stable.flatMap(toolOperations).every((op) => !op.entry.beta)).toBe(true);
       // Forms is beta-only in HubSpot's index but must exist by default.
       expect(tools.some((t) => t.group === "forms")).toBe(true);
       expect(stable.some((t) => t.group === "forms")).toBe(false);

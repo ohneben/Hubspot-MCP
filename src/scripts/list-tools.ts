@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAllSpecs } from "../openapi.js";
 import { loadCatalog, formatRequirements } from "../specs.js";
-import { operationsToTools, prettyGroup } from "../tools.js";
+import { operationsToTools, prettyGroup, toolOperations } from "../tools.js";
 import { CATEGORIES, safetyBucket, type CategoryId } from "../categories.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,20 +33,22 @@ for (const t of tools) {
   const bucket = safetyBucket(cat);
   bucketCounts[bucket]++;
   catCounts.set(cat, (catCounts.get(cat) ?? 0) + 1);
-  const op = t.operation!;
-  const row =
-    byGroup.get(op.group) ??
-    {
-      area: op.entry.area,
-      api: op.entry.name,
-      plan: formatRequirements(op.entry.requirements),
-      beta: op.entry.beta,
-      read: 0,
-      write: 0,
-      destructive: 0,
-    };
-  row[bucket]++;
-  byGroup.set(op.group, row);
+  // Groups count endpoints, so a consolidated tool counts once per endpoint it reaches.
+  for (const op of toolOperations(t)) {
+    const row =
+      byGroup.get(op.group) ??
+      {
+        area: op.entry.area,
+        api: op.entry.name,
+        plan: formatRequirements(op.entry.requirements),
+        beta: op.entry.beta,
+        read: 0,
+        write: 0,
+        destructive: 0,
+      };
+    row[bucket]++;
+    byGroup.set(op.group, row);
+  }
 }
 
 console.log(
@@ -62,7 +64,7 @@ for (const [id, meta] of Object.entries(CATEGORIES)) {
   if (c > 0) console.log(`  ${meta.banner.padEnd(40)} ${String(c).padStart(4)}`);
 }
 
-console.log("\nBy resource group (🟢 read / 🟡 write / 🔴 destructive) — group key in (parens):");
+console.log("\nEndpoints by resource group (🟢 read / 🟡 write / 🔴 destructive) — group key in (parens):");
 for (const [group, row] of [...byGroup.entries()].sort((a, b) => a[1].area.localeCompare(b[1].area) || a[0].localeCompare(b[0]))) {
   const flags = [row.beta ? "beta" : "", row.plan && !row.plan.startsWith("any") ? row.plan : ""].filter(Boolean).join(" · ");
   console.log(
@@ -73,7 +75,7 @@ for (const [group, row] of [...byGroup.entries()].sort((a, b) => a[1].area.local
 if (process.argv.includes("--names")) {
   console.log("\nAll tool names:");
   for (const t of tools) {
-    console.log(`  ${t.name.padEnd(64)} ${t.operation!.method.toUpperCase().padEnd(6)} ${t.operation!.path}`);
+    console.log(`  ${t.name.padEnd(64)} ${t.endpoint!.method.toUpperCase().padEnd(6)} ${t.endpoint!.path}`);
   }
 }
 

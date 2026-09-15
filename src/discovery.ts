@@ -1,5 +1,6 @@
 import type { ServerConfig } from "./config.js";
-import type { ToolDefinition } from "./tools.js";
+import { accessByGroup, type CapabilityProfile, type GroupAccess, type GroupReport } from "./capabilities.js";
+import { toolOperations, type ToolDefinition } from "./tools.js";
 
 /**
  * Discovery mode (`HUBSPOT_TOOL_MODE=discovery`).
@@ -29,7 +30,7 @@ export function discoveryTools(cfg: ServerConfig, registrySize: number): ToolDef
     name: SEARCH_ENDPOINTS_TOOL,
     description: [
       "🟢 READ-ONLY · endpoint catalog search",
-      `Search this server's registry of ${registrySize} HubSpot endpoints by keyword, group, area or safety category. Returns one compact line per endpoint (name, method+path, category, plan tier).`,
+      `Search this server's catalog of ${registrySize} HubSpot endpoint tools by keyword, group, area or safety category. Returns one compact line per tool (name, method+path, category, API; consolidated tools also list the values of their selector argument, e.g. objectType). Each line also says whether this token can use the tool, from the access check the server ran at startup.`,
       `Workflow: search here → ${GET_ENDPOINT_TOOL} for the input schema → ${INVOKE_ENDPOINT_TOOL} to call it.`,
     ].join("\n\n"),
     inputSchema: {
@@ -48,6 +49,10 @@ export function discoveryTools(cfg: ServerConfig, registrySize: number): ToolDef
         },
         limit: { type: "integer", minimum: 1, maximum: MAX_PAGE_SIZE, description: `Page size (default ${DEFAULT_PAGE_SIZE}).` },
         offset: { type: "integer", minimum: 0, description: "Pagination offset (default 0)." },
+        usable_only: {
+          type: "boolean",
+          description: "Only return tools this token can use according to the startup access check. Default false.",
+        },
       },
       additionalProperties: false,
     },
@@ -122,14 +127,58 @@ export function discoveryTools(cfg: ServerConfig, registrySize: number): ToolDef
 
 /* ───────────────────────── handlers ───────────────────────── */
 
-function summaryLine(t: ToolDefinition): string {
-  const op = t.operation;
-  if (!op) return t.name;
-  const plan = op.entry.beta ? " · beta" : "";
-  return `${t.name} — ${op.method.toUpperCase()} ${op.path} — ${t.category} — ${op.entry.name} (${op.entry.area})${plan}`;
+const SELECTOR_VALUES_SHOWN = 8;
+
+const ACCESS_LABEL: Record<GroupAccess, string> = {
+  available: "usable",
+  missing_scopes: "missing scopes",
+  blocked: "blocked by plan or permissions",
+  unverified: "not verified",
+};
+
+const statusOf = (access: Map<string, GroupReport>, group: string): GroupAccess => access.get(group)?.access ?? "unverified";
+
+/** One phrase for how much of a tool this token can use. */
+function accessSummary(t: ToolDefinition, access: Map<string, GroupReport>): string {
+  const statuses = toolOperations(t).map((op) => statusOf(access, op.group));
+  const usable = statuses.filter((s) => s === "available").length;
+  if (usable === statuses.length) return ACCESS_LABEL.available;
+  if (usable > 0) return `usable for ${usable} of ${statuses.length} endpoints`;
+  const distinct = [...new Set(statuses)];
+  return distinct.map((s) => ACCESS_LABEL[s]).join(" / ");
 }
 
-export function handleSearchEndpoints(registry: ToolDefinition[], rawArgs: unknown): string {
+/** Per-endpoint detail: the selector values by status, or the group's reason. */
+function accessDetail(t: ToolDefinition, access: Map<string, GroupReport>): string {
+  if (!t.consolidated) {
+    const report = t.operation ? access.get(t.operation.group) : undefined;
+    return `Access for this token: ${ACCESS_LABEL[report?.access ?? "unverified"]}${report?.accessReason ? `. ${report.accessReason}` : "."}`;
+  }
+  const byStatus = new Map<GroupAccess, string[]>();
+  for (const v of t.consolidated.variants) {
+    const status = statusOf(access, v.operation.group);
+    byStatus.set(status, [...(byStatus.get(status) ?? []), v.wildcard ? "custom object types" : v.value]);
+  }
+  const parts = [...byStatus].map(([status, values]) => `${ACCESS_LABEL[status]}: ${values.join(", ")}`);
+  return `Access for this token by ${t.consolidated.family.param}: ${parts.join("; ")}.`;
+}
+
+function summaryLine(t: ToolDefinition, access?: Map<string, GroupReport>): string {
+  const e = t.endpoint;
+  if (!t.operation || !e) return t.name;
+  const beta = toolOperations(t).every((op) => op.entry.beta) ? " · beta" : "";
+  let selector = "";
+  if (t.consolidated) {
+    const values = t.consolidated.variants.filter((v) => !v.wildcard).map((v) => v.value);
+    const more = values.length > SELECTOR_VALUES_SHOWN || t.consolidated.variants.some((v) => v.wildcard);
+    selector = ` — ${t.consolidated.family.param}: ${values.slice(0, SELECTOR_VALUES_SHOWN).join("|")}${more ? "|…" : ""}`;
+  }
+  const usable = access ? ` — access: ${accessSummary(t, access)}` : "";
+  return `${t.name} — ${e.method.toUpperCase()} ${e.path} — ${t.category} — ${e.api} (${e.area})${beta}${selector}${usable}`;
+}
+
+export function handleSearchEndpoints(registry: ToolDefinition[], rawArgs: unknown, profile?: CapabilityProfile): string {
+  const access = profile ? accessByGroup(profile) : undefined;
   const args = (rawArgs && typeof rawArgs === "object" ? rawArgs : {}) as Record<string, unknown>;
   const query = typeof args.query === "string" ? args.query.toLowerCase().split(/\s+/).filter(Boolean) : [];
   const group = typeof args.group === "string" ? args.group.toLowerCase() : undefined;
@@ -141,18 +190,23 @@ export function handleSearchEndpoints(registry: ToolDefinition[], rawArgs: unkno
   const matches = registry.filter((t) => {
     const op = t.operation;
     if (!op) return false;
-    if (group && op.group.toLowerCase() !== group) return false;
+    const ops = toolOperations(t);
+    if (args.usable_only === true && access && !ops.some((o) => statusOf(access, o.group) === "available")) return false;
+    // A consolidated tool matches its own group key and the group of any endpoint it reaches.
+    if (group && t.group?.toLowerCase() !== group && !ops.some((o) => o.group.toLowerCase() === group)) return false;
     if (area && op.entry.area.toLowerCase() !== area) return false;
     if (category && t.category !== category) return false;
     if (query.length > 0) {
-      const haystack = `${t.name} ${op.method} ${op.path} ${op.entry.name} ${op.summary ?? ""}`.toLowerCase();
+      const aliases = t.consolidated?.variants.flatMap((v) => v.aliases).join(" ") ?? "";
+      const e = t.endpoint;
+      const haystack = `${t.name} ${e?.method ?? op.method} ${e?.path ?? op.path} ${e?.api ?? op.entry.name} ${t.annotations.title ?? ""} ${aliases}`.toLowerCase();
       if (!query.every((q) => haystack.includes(q))) return false;
     }
     return true;
   });
 
   const page = matches.slice(offset, offset + limit);
-  const lines = page.map(summaryLine);
+  const lines = page.map((t) => summaryLine(t, access));
   const header = `${matches.length} endpoint(s) matched; showing ${offset + 1}–${offset + page.length}.`;
   const footer =
     matches.length > offset + page.length
@@ -161,7 +215,7 @@ export function handleSearchEndpoints(registry: ToolDefinition[], rawArgs: unkno
   return `${header}\n\n${lines.join("\n")}${footer}\n\nNext: call ${GET_ENDPOINT_TOOL} with a name to see its input schema.`;
 }
 
-export function handleGetEndpoint(registry: Map<string, ToolDefinition>, rawArgs: unknown): string {
+export function handleGetEndpoint(registry: Map<string, ToolDefinition>, rawArgs: unknown, profile?: CapabilityProfile): string {
   const args = (rawArgs && typeof rawArgs === "object" ? rawArgs : {}) as Record<string, unknown>;
   const name = String(args.name ?? "");
   const tool = registry.get(name);
@@ -171,6 +225,7 @@ export function handleGetEndpoint(registry: Map<string, ToolDefinition>, rawArgs
   return [
     `# ${tool.name}`,
     tool.description,
+    ...(profile ? [accessDetail(tool, accessByGroup(profile))] : []),
     `Input schema (JSON Schema):`,
     JSON.stringify(tool.inputSchema, null, 2),
   ].join("\n\n");

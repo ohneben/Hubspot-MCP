@@ -44,9 +44,11 @@ export interface ServerConfig {
   readOnly: boolean;
   /** Include beta / developer-preview APIs (default true — full coverage). */
   includeBeta: boolean;
-  /** `all` = one tool per endpoint; `discovery` = 3 meta-tools that search,
-   * inspect and invoke the same registry (for context-constrained clients). */
+  /** `discovery` (default) = 3 meta-tools that search, inspect and invoke the
+   * registry; `all` = one tool per endpoint or endpoint family. */
   toolMode: ToolMode;
+  /** Check scopes and probe paid-tier or beta groups when the server starts. */
+  capabilityCheck: boolean;
   /** Expose the CRM GraphQL query tool. */
   enableGraphql: boolean;
   /** GraphQL endpoint (CRM GraphQL API). */
@@ -105,7 +107,7 @@ function baseUrlEnv(): string {
 }
 
 function toolModeEnv(): ToolMode {
-  const v = (process.env.HUBSPOT_TOOL_MODE ?? "all").trim().toLowerCase();
+  const v = (process.env.HUBSPOT_TOOL_MODE?.trim() || "discovery").toLowerCase();
   if (v === "all" || v === "discovery") return v;
   throw new Error(`Unknown HUBSPOT_TOOL_MODE: "${v}". Use "all" or "discovery".`);
 }
@@ -144,6 +146,7 @@ export function loadConfig(): ServerConfig {
     readOnly: boolEnv("HUBSPOT_READ_ONLY", false),
     includeBeta: boolEnv("HUBSPOT_INCLUDE_BETA", true),
     toolMode: toolModeEnv(),
+    capabilityCheck: boolEnv("HUBSPOT_CAPABILITY_CHECK", true),
     enableGraphql: boolEnv("HUBSPOT_ENABLE_GRAPHQL", true),
     graphqlUrl: process.env.HUBSPOT_GRAPHQL_URL?.trim() || `${baseUrl}/collector/graphql`,
     enableRawRequest: boolEnv("HUBSPOT_ENABLE_RAW_REQUEST", true),
