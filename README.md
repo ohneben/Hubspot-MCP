@@ -275,7 +275,7 @@ Everything is set in `.env` (copied from `.env.example`):
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `HUBSPOT_ACCESS_TOKEN` | ✅ | — | Service key or legacy private app token (both `pat-…`), or an OAuth access token |
+| `HUBSPOT_ACCESS_TOKEN` | ✅ | — | Service key or legacy private app token (both `pat-…`), or an OAuth access token. Without it the server still starts and lists its tools (for registries and inspectors), but every call returns setup instructions |
 | `HUBSPOT_BASE_URL` | — | `https://api.hubapi.com` | Use `https://api-eu1.hubapi.com` for EU data residency |
 | `MCP_TRANSPORT` | — | `stdio` | `stdio` or `http` (the Docker image defaults to `http`) |
 | `PORT` | — | `8765` | HTTP listen port |
