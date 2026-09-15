@@ -168,6 +168,63 @@ describe("runCapabilities", () => {
     );
     expect(report.checkedAt).toBe("startup");
   });
+
+  it("reads HubSpot's error category, spots token-type 401s and caveats read-only proof", async () => {
+    // Grant exactly the scopes the spec lists for these groups, so only the probes decide.
+    const groups = ["appointments", "custom-channels", "events", "forecasts", "leads", "schemas"];
+    const scopes = [
+      ...new Set(operations.filter((o) => groups.includes(o.group)).flatMap((o) => o.scopeAlternatives.flat())),
+    ];
+    const fetchImpl = (async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/account-info/v3/details")) return json(200, { portalId: 77 });
+      if (u.endsWith("/oauth/v2/private-apps/get/access-token-info")) return json(200, { scopes });
+      if (u.endsWith("/account-info/v3/api-usage/daily/private-apps")) return json(200, []);
+      throw new Error(`unexpected url ${u}`);
+    }) as unknown as typeof fetch;
+
+    const probeArgs = new Map<string, unknown>();
+    const report = JSON.parse(
+      await runCapabilities(cfg(fetchImpl), operations, {}, async (_c, op, args) => {
+        probeArgs.set(op.group, args);
+        if (op.group === "forecasts") {
+          return { status: 403, ok: false, body: { category: "MISSING_SCOPES", message: "The scope needed for this API call isn't available for public use." } };
+        }
+        if (op.group === "custom-channels") {
+          return { status: 401, ok: false, body: { category: "INVALID_AUTHENTICATION", message: "This API supports OAuth 2.0 authentication." } };
+        }
+        // Responses as seen on a live portal.
+        if (op.group === "leads") {
+          return { status: 403, ok: false, body: { category: "MISSING_SCOPES", message: "This app hasn't been granted all required scopes to make this call." } };
+        }
+        if (op.group === "events") {
+          return { status: 403, ok: false, body: { message: "Insufficient scopes, requires one of: [event-detail-read,web-analytics-api-access]" } };
+        }
+        return { status: 200, ok: true };
+      }),
+    );
+    const group = (key: string) => report.toolGroups.find((g: { group: string }) => g.group === key);
+
+    // The token holds the leads scope, so MISSING_SCOPES points at the plan.
+    expect(group("leads").access).toBe("blocked");
+    expect(group("leads").accessReason).toContain("plan does not include it");
+    // A message that names scopes the token lacks is a real missing scope.
+    expect(group("events").access).toBe("missing_scopes");
+    expect(group("events").accessReason).toContain("event-detail-read");
+
+    expect(group("forecasts").access).toBe("blocked");
+    expect(group("forecasts").accessReason).toContain("service keys or private apps");
+    expect(probeArgs.get("forecasts")).toMatchObject({ objectType: "forecast" });
+
+    expect(group("custom-channels").access).toBe("blocked");
+    expect(group("custom-channels").accessReason).toContain("does not accept this kind of token");
+
+    expect(group("appointments").probe.endpoint).toBe("GET /crm/objects/v3/appointments");
+    expect(group("appointments").access).toBe("available");
+
+    expect(group("schemas").access).toBe("available");
+    expect(group("schemas").accessReason).toContain("writes can still be refused");
+  });
 });
 
 describe("summarizeProfile", () => {
@@ -186,7 +243,20 @@ describe("summarizeProfile", () => {
     expect(text).toContain("portal 77");
     expect(text).toContain("1 of 3 API groups are usable");
     expect(text).toContain("Missing scopes: deals.");
-    expect(text).toContain("Blocked by plan tier or permissions: hubdb.");
+    expect(text).toContain("Blocked by plan tier, permissions or token type: hubdb.");
+  });
+
+  it("warns that a read does not prove write access on paid tiers", () => {
+    const text = summarizeProfile({
+      checkedAt: "2026-09-15T00:00:00.000Z",
+      account: {},
+      token: {},
+      notes: [],
+      toolGroups: [
+        { group: "schemas", access: "available", plan: "Enterprise tier of any hub", probe: { status: 200, ok: true, endpoint: "GET /x" } },
+      ],
+    } as unknown as CapabilityProfile);
+    expect(text).toContain("can still refuse writes: schemas.");
   });
 
   it("says so plainly when HubSpot could not be reached", () => {

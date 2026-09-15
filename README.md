@@ -158,7 +158,13 @@ to your token. This server is built around that reality:
    observe: the token's granted scopes, and one cheap read per paid-tier or
    beta group (up to about 30 API calls; plan gates only surface as 403s).
    Every group gets a status: `available`, `missing_scopes`, `blocked` (plan
-   tier or user permission) or `unverified`. The model receives a summary in
+   tier, user permission, or a 401 from an API that does not accept this kind
+   of token) or `unverified`. HubSpot's error details count: a 403 that names
+   scopes the token lacks is a missing scope, while `MISSING_SCOPES` for an
+   object whose scopes the token already holds is how HubSpot answers a plan
+   gate, so that is reported as blocked. A read
+   that succeeds proves read access only; a paid-tier API can still refuse
+   writes, and the report says so. The model receives a summary in
    the server instructions, `hubspot_search_endpoints` marks each result (and
    takes `usable_only: true`), and `hubspot_get_capabilities` returns the full
    report with reasons, `"unlockedByScopes": "13/16"` counts and the scopes to
@@ -524,7 +530,7 @@ Communication Preferences v3 + v4).
 ```bash
 npm install
 npm run build       # compile TypeScript → dist/
-npm test            # run the Vitest suite (150 tests)
+npm test            # run the Vitest suite (160 tests)
 npm run list-tools  # print the categorized tool catalog (no credentials needed)
 npm run fetch-specs # refresh spec/ from HubSpot's public API index
 ```
@@ -564,7 +570,7 @@ publish a Docker image to the GitHub Container Registry.
   `429` it still receives, honoring `Retry-After`. Check real usage anytime via
   `hubspot_get_capabilities`.
 - **Request bodies**: write tools take a `body` argument; its schema is resolved
-  from the spec and shown to the model (e.g. `contacts_create` expects
+  from the spec and shown to the model (e.g. `crm_objects_create` expects
   `{"properties": {…}}`).
 - **Beta APIs** (developer preview / public beta) are included by default and
   labelled ⚠️ in descriptions; hide them with `HUBSPOT_INCLUDE_BETA=false`.
@@ -573,7 +579,8 @@ publish a Docker image to the GitHub Container Registry.
 
 - Your access token lives only in `.env`, which is git-ignored. **Never commit
   real secrets.** The token grants whatever its scopes allow — if it leaks,
-  rotate it in **Settings → Integrations → Private Apps**.
+  expire it in **Settings → Integrations → Service Keys** (or **Private Apps**
+  for a legacy token).
 - The HTTP endpoint refuses to start unauthenticated once it is bound beyond
   this machine. Set `MCP_AUTH_TOKEN` (`openssl rand -hex 32`) and send it as an
   `Authorization: Bearer <token>` header, ideally behind TLS. A loopback bind
@@ -583,9 +590,9 @@ publish a Docker image to the GitHub Container Registry.
   (marketing & transactional email, sequences) carry the right annotations so a
   well-behaved host prompts before acting — keep that confirmation on, or run
   with `HUBSPOT_READ_ONLY=true`.
-- Scope the blast radius at the source: grant the private app only the scopes
-  you actually need — the capability report will tell you what's missing when
-  you want more.
+- Scope the blast radius at the source: grant the service key only the scopes
+  you actually need — the startup access check and `hubspot_get_capabilities`
+  tell you what's missing when you want more. The check itself only reads.
 
 See [SECURITY.md](./SECURITY.md) for the full policy and how to report a
 vulnerability.

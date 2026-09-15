@@ -5,7 +5,7 @@ import type { ToolDefinition } from "./tools.js";
  * The escape hatch: call ANY path under the configured HubSpot API host, with
  * the server still injecting auth, throttling, timing out and retrying.
  *
- * The ~1,000 generated tools cover every documented endpoint, but HubSpot
+ * The generated tools cover every documented endpoint, but HubSpot
  * ships new APIs and betas continuously — this tool means the assistant is
  * never stuck waiting for a spec refresh. It can perform any method including
  * DELETE, so it carries `destructiveHint: true` (hosts should confirm before

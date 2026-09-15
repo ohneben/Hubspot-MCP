@@ -40,6 +40,36 @@
           "isRequired": false
         },
         {
+          "name": "HUBSPOT_TOOL_MODE",
+          "description": "'discovery' (default) exposes 3 meta-tools that search, inspect and call all 1,076 endpoints; 'all' exposes the ~690 endpoint tools directly.",
+          "isRequired": false,
+          "default": "discovery",
+          "choices": [
+            "discovery",
+            "all"
+          ]
+        },
+        {
+          "name": "HUBSPOT_READ_ONLY",
+          "description": "Set to 'true' to expose only read-only tools.",
+          "isRequired": false,
+          "default": "false",
+          "choices": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "HUBSPOT_CAPABILITY_CHECK",
+          "description": "Read the token's scopes and probe paid-tier or beta API groups at startup (read-only, up to about 30 API calls). Set to 'false' to skip.",
+          "isRequired": false,
+          "default": "true",
+          "choices": [
+            "true",
+            "false"
+          ]
+        },
+        {
           "name": "MCP_AUTH_TOKEN",
           "description": "Only for MCP_TRANSPORT=http: bearer token required on /mcp. Without it a non-loopback bind refuses to start.",
           "isRequired": false,

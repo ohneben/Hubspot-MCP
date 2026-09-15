@@ -3,12 +3,12 @@ import { accessByGroup, type CapabilityProfile, type GroupAccess, type GroupRepo
 import { toolOperations, type ToolDefinition } from "./tools.js";
 
 /**
- * Discovery mode (`HUBSPOT_TOOL_MODE=discovery`).
+ * Discovery mode (`HUBSPOT_TOOL_MODE=discovery`, the default).
  *
- * The full tool surface is ~1,000 tools. Most MCP hosts handle that fine —
- * and group filtering trims it — but some clients (or very long sessions)
- * prefer a tiny tool list. Discovery mode exposes the SAME registry through
- * three meta-tools instead of one tool per endpoint:
+ * The full tool surface is ~690 tools and ~370k tokens of definitions. Hosts
+ * with tool search cope with that, most others do not, so by default the SAME
+ * registry is exposed through three meta-tools instead of one tool per
+ * endpoint:
  *
  *   1. hubspot_search_endpoints — find endpoints by keyword/group/category
  *   2. hubspot_get_endpoint     — read one endpoint's full schema
@@ -132,7 +132,7 @@ const SELECTOR_VALUES_SHOWN = 8;
 const ACCESS_LABEL: Record<GroupAccess, string> = {
   available: "usable",
   missing_scopes: "missing scopes",
-  blocked: "blocked by plan or permissions",
+  blocked: "blocked (plan, permissions or token type)",
   unverified: "not verified",
 };
 
