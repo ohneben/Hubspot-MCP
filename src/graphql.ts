@@ -24,6 +24,7 @@ export function graphqlTool(cfg: ServerConfig): ToolDefinition {
     "HubSpot's GraphQL endpoint supports queries only (no mutations), so this cannot change account data. " +
       `Endpoint: ${cfg.graphqlUrl}. ` +
       "Plan: Marketing Hub or Content Hub Professional/Enterprise. Scopes: collector.graphql_query.execute. " +
+      "Not available with a HubSpot service key; it needs a private app or OAuth token. " +
       'Example: {"query": "query { CRM { contact_collection(limit: 3) { items { email firstname associations { company_collection__primary { items { name } } } } } } }"}',
   ].join("\n\n");
 

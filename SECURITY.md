@@ -43,10 +43,12 @@ transactional email, sequence enrollments), **merge records irreversibly** and
 
 - **Your access token is a secret.** `HUBSPOT_ACCESS_TOKEN` lives in `.env`,
   which is git-ignored — never commit or share it. If it leaks, rotate it in
-  **HubSpot → Settings → Integrations → Private Apps**. The token grants
-  whatever its scopes allow.
-- **Scope the token at the source.** A private app only receives the scopes you
-  tick — grant read scopes for reporting deployments and add write scopes
+  **HubSpot → Settings → Integrations → Service Keys** (or **Private Apps** for
+  a legacy token). A rotated service key stays valid for a 7-day grace period
+  unless you expire it immediately, so expire a leaked key rather than waiting.
+  The token grants whatever its scopes allow.
+- **Scope the token at the source.** A service key or private app only receives
+  the scopes you tick — grant read scopes for reporting deployments and add write scopes
   deliberately. The `hubspot_get_capabilities` tool shows exactly which tool
   groups the current scopes unlock.
 - **Credentials never reach the model.** The server injects the

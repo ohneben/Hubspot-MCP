@@ -154,8 +154,8 @@ to your token. This server is built around that reality:
 
 ## Requirements
 
-- A **HubSpot account** and a **private app access token** (or an OAuth access
-  token) — see [Get your API credentials](#get-your-api-credentials).
+- A **HubSpot account** and a **service key** (or an existing legacy private
+  app token); see [Get your API credentials](#get-your-api-credentials).
 - **Docker** (Docker Desktop on macOS/Windows) for the quick start below — or
   **Node.js ≥ 18** to [run from source](#run-from-source-stdio-no-docker).
 
@@ -238,23 +238,33 @@ docker run -d --name hubspot-mcp -p 127.0.0.1:8765:8765 --env-file .env \
 
 ## Get your API credentials
 
-The recommended way is a **private app** token:
+The recommended way is a **service key**, HubSpot's replacement for legacy
+private apps:
 
-1. In HubSpot, open **Settings → Integrations → Private Apps** and click
-   **Create private app**.
-2. On the **Scopes** tab, tick what you want the assistant to reach. Scopes map
-   1:1 to tool groups — grant read scopes (`crm.objects.contacts.read`, …) for
-   a reporting setup, add write scopes only where you want changes. You can
-   change scopes later; the capability report shows what's missing for any
-   group.
-3. Create the app and copy the **access token** (`pat-…`) →
-   `HUBSPOT_ACCESS_TOKEN` in `.env`.
+1. In HubSpot, open **Settings → Integrations → Service Keys** (or
+   **Development → Keys → Service Keys**) and create a key. You need super
+   admin rights or the *Developer tools access* permission.
+2. Select the scopes you want the assistant to reach. Scopes map 1:1 to tool
+   groups: grant read scopes (`crm.objects.contacts.read`, …) for a reporting
+   setup, and add write scopes only where you want changes.
+3. Copy the key (`pat-…`) → `HUBSPOT_ACCESS_TOKEN` in `.env`. It is sent as a
+   bearer token exactly like a private app token, so nothing else changes.
 
 Notes:
 
+- **Service keys are in public beta** and differ from private apps in three
+  ways that matter here: they do **not** support GraphQL (set
+  `HUBSPOT_ENABLE_GRAPHQL=false`), rotation keeps the old key valid for a
+  7-day grace period, and the scope and usage figures in the capability report
+  may be incomplete for them.
+- **Existing private app tokens keep working.** HubSpot stops the creation of
+  new legacy private apps (existing portals from 26 October 2026, new portals
+  from 28 September 2026); apps already created are not affected. A private
+  app is still the only option here if you rely on the GraphQL tool.
+
 - **OAuth access tokens work too** (for apps you've built) — but they expire
-  after ~30 minutes and this server does not refresh them; private-app tokens
-  are the right fit for a long-running server.
+  after ~30 minutes and this server does not refresh them; a service key or
+  private app token is the right fit for a long-running server.
 - The token determines the portal — no portal ID needed.
 - **EU data residency**: if your portal lives in HubSpot's EU data center, set
   `HUBSPOT_BASE_URL=https://api-eu1.hubapi.com`.
@@ -265,7 +275,7 @@ Everything is set in `.env` (copied from `.env.example`):
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `HUBSPOT_ACCESS_TOKEN` | ✅ | — | Private-app token (`pat-…`) or OAuth access token |
+| `HUBSPOT_ACCESS_TOKEN` | ✅ | — | Service key or legacy private app token (both `pat-…`), or an OAuth access token |
 | `HUBSPOT_BASE_URL` | — | `https://api.hubapi.com` | Use `https://api-eu1.hubapi.com` for EU data residency |
 | `MCP_TRANSPORT` | — | `stdio` | `stdio` or `http` (the Docker image defaults to `http`) |
 | `PORT` | — | `8765` | HTTP listen port |
