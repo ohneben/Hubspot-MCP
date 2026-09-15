@@ -227,8 +227,9 @@ export function buildHint(op: Operation | null, status: number, body: unknown): 
 
   if (status === 401) {
     return (
-      "Your HUBSPOT_ACCESS_TOKEN was rejected. Private-app tokens (pat-…) come from " +
-      "Settings → Integrations → Private Apps and only stop working when rotated/revoked; " +
+      "Your HUBSPOT_ACCESS_TOKEN was rejected. Service keys and private app tokens (pat-…) come from " +
+      "Settings → Integrations → Service Keys (or Private Apps) and only stop working when " +
+      "rotated past their grace period or revoked; " +
       "OAuth access tokens expire after ~30 minutes and must be refreshed. Also check you are " +
       "pointing at the right region base URL (api.hubapi.com vs api-eu1.hubapi.com)."
     );
@@ -242,8 +243,9 @@ export function buildHint(op: Operation | null, status: number, body: unknown): 
         : "Check the endpoint's required scopes in the tool description.";
     return (
       `The token is valid but missing a required scope. ${scopeText} ` +
-      "For a private app: HubSpot → Settings → Integrations → Private Apps → your app → Scopes, " +
-      "add the scope and re-copy the token. For OAuth: add the scope to the app and re-authorize. " +
+      "For a service key: HubSpot → Settings → Integrations → Service Keys → your key, add the scope. " +
+      "For a private app: Settings → Integrations → Private Apps → your app → Scopes, add the scope " +
+      "and re-copy the token. For OAuth: add the scope to the app and re-authorize. " +
       "The hubspot_get_capabilities tool shows which scopes this token has."
     );
   }

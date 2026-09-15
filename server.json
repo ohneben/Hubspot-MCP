@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ohneben/hubspot-mcp",
   "title": "HubSpot",
-  "description": "HubSpot MCP server: the whole public API (1,000+ endpoints across CRM, CMS, Marketing, Automation, Commerce and more) as safety-categorized, hub/plan-aware tools (Docker + Streamable HTTP).",
+  "description": "HubSpot API: 1,000+ endpoints as safety-categorized, hub- and plan-aware MCP tools, stdio or HTTP.",
   "version": "1.0.1",
   "websiteUrl": "https://github.com/ohneben/Hubspot-MCP#readme",
   "repository": {
@@ -15,27 +15,34 @@
       "identifier": "ghcr.io/ohneben/hubspot-mcp:1.0.1",
       "runtimeHint": "docker",
       "transport": {
-        "type": "streamable-http"
+        "type": "stdio"
       },
       "environmentVariables": [
         {
+          "name": "MCP_TRANSPORT",
+          "description": "Server transport. Set to 'stdio' for local MCP clients; the image otherwise starts the Streamable HTTP transport.",
+          "isRequired": true,
+          "default": "stdio",
+          "choices": [
+            "stdio",
+            "http"
+          ]
+        },
+        {
           "name": "HUBSPOT_ACCESS_TOKEN",
-          "description": "HubSpot private-app access token (pat-...) from Settings -> Integrations -> Private Apps (an OAuth access token also works).",
-          "format": "string",
+          "description": "HubSpot service key or legacy private app token (pat-...), from Settings -> Integrations. An OAuth access token also works.",
           "isRequired": true,
           "isSecret": true
         },
         {
           "name": "HUBSPOT_BASE_URL",
           "description": "API host. Default https://api.hubapi.com; use https://api-eu1.hubapi.com for EU data residency portals.",
-          "format": "string",
           "isRequired": false
         },
         {
           "name": "MCP_AUTH_TOKEN",
-          "description": "Bearer token required on the /mcp endpoint. Required whenever HOST is not a loopback address, otherwise the server refuses to start.",
-          "format": "string",
-          "isRequired": true,
+          "description": "Only for MCP_TRANSPORT=http: bearer token required on /mcp. Without it a non-loopback bind refuses to start.",
+          "isRequired": false,
           "isSecret": true
         }
       ]
